@@ -1,6 +1,7 @@
 package service;
 
 import java.util.List;
+import java.util.Map;
 
 import model.Student;
 
@@ -17,5 +18,7 @@ public interface StudentService {
     void updateStudent(Student student);
 
     void deleteStudent(Integer studentId);
+    
+    Map<Integer, List<Student>> getStudentsGroupedByCourse();
 	
 }

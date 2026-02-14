@@ -119,6 +119,13 @@ public class StudentServiceImpl implements StudentService {
                 "DELETED: " + studentId);
     }
 
+    @Override
+    public Map<Integer, List<Student>> getStudentsGroupedByCourse() {
+
+        return studentMap.values()
+                .stream()
+                .collect(Collectors.groupingBy(Student::getCourseId));
+    }
     
     private void validateStudent(Student student) {
 
@@ -137,5 +144,7 @@ public class StudentServiceImpl implements StudentService {
             throw new IllegalArgumentException(
                     "Student ID cannot be null");
         }
-    }
+    } 
+    
+    
 }

@@ -9,6 +9,7 @@ import util.FileUtil;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 public class ReportServiceImpl implements ReportService {
@@ -34,138 +35,209 @@ public class ReportServiceImpl implements ReportService {
         this.paymentService = paymentService;
     }
 
+    // ================= EXISTING REPORTS =================
+
     @Override
     public void generateStudentReportAsync() {
-
-        System.out.println("Student report generation started...");
 
         executor.submit(() -> {
 
             StringBuilder report = new StringBuilder(2048);
 
-            report.append("===== STUDENT REPORT =====")
-                    .append(System.lineSeparator())
-                    .append("Generated At: ")
-                    .append(LocalDateTime.now())
-                    .append(System.lineSeparator())
-                    .append(System.lineSeparator());
+            report.append("===== STUDENT REPORT =====\n")
+                  .append("Generated At: ")
+                  .append(LocalDateTime.now())
+                  .append("\n\n");
 
-            List<Student> students = studentService.getAllStudents();
+            for (Student student : studentService.getAllStudents()) {
 
-            for (Student student : students) {
-
-                BigDecimal attendancePercentage;
-
-                try {
-                    double percentage =
-                            attendanceService.calculateAttendancePercentage(
-                                    student.getStudentId());
-
-                    attendancePercentage =
-                            BigDecimal.valueOf(percentage);
-
-                } catch (Exception e) {
-
-                    attendancePercentage = BigDecimal.ZERO;
-
-                    FileUtil.writeToFile(
-                            "logs/error.txt",
-                            "Attendance error for studentId: "
-                                    + student.getStudentId()
-                    );
-                }
-
-                List<Payment> payments =
-                        paymentService.getPaymentsByStudent(
+                double attendance =
+                        attendanceService.calculateAttendancePercentage(
                                 student.getStudentId());
 
-                BigDecimal totalPaid = payments.stream()
-                        .map(Payment::getAmount)
-                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal totalPaid =
+                        paymentService.getPaymentsByStudent(
+                                        student.getStudentId())
+                                .stream()
+                                .map(Payment::getAmount)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                report.append("--------------------------------")
-                        .append(System.lineSeparator())
-                        .append("ID              : ")
-                        .append(student.getStudentId())
-                        .append(System.lineSeparator())
-                        .append("Name            : ")
-                        .append(student.getName())
-                        .append(System.lineSeparator())
-                        .append("Email           : ")
-                        .append(student.getEmail())
-                        .append(System.lineSeparator())
-                        .append("Attendance %    : ")
-                        .append(attendancePercentage)
-                        .append(System.lineSeparator())
-                        .append("Total Fees Paid : ")
-                        .append(totalPaid)
-                        .append(System.lineSeparator());
+                report.append("--------------------------------\n")
+                      .append("ID           : ").append(student.getStudentId()).append("\n")
+                      .append("Name         : ").append(student.getName()).append("\n")
+                      .append("Email        : ").append(student.getEmail()).append("\n")
+                      .append("Attendance % : ").append(attendance).append("\n")
+                      .append("Fees Paid    : ").append(totalPaid).append("\n");
             }
-
-            report.append("===== STUDENT REPORT END =====")
-                    .append(System.lineSeparator());
 
             FileUtil.writeToFile(
                     "reports/student-report.txt",
                     report.toString()
             );
-
-            System.out.println("Student report generation completed.");
         });
     }
 
     @Override
     public void generateTeacherReportAsync() {
 
-        System.out.println("Teacher report generation started...");
-
         executor.submit(() -> {
 
             StringBuilder report = new StringBuilder(1024);
 
-            report.append("===== TEACHER REPORT =====")
-                    .append(System.lineSeparator())
-                    .append("Generated At: ")
-                    .append(LocalDateTime.now())
-                    .append(System.lineSeparator())
-                    .append(System.lineSeparator());
+            report.append("===== TEACHER REPORT =====\n")
+                  .append("Generated At: ")
+                  .append(LocalDateTime.now())
+                  .append("\n\n");
 
-            List<Teacher> teachers = teacherService.getAllTeachers();
+            for (Teacher teacher : teacherService.getAllTeachers()) {
 
-            for (Teacher teacher : teachers) {
-
-                report.append("--------------------------------")
-                        .append(System.lineSeparator())
-                        .append("ID      : ")
-                        .append(teacher.getTeacherId())
-                        .append(System.lineSeparator())
-                        .append("Name    : ")
-                        .append(teacher.getName())
-                        .append(System.lineSeparator())
-                        .append("Subject : ")
-                        .append(teacher.getSubject())
-                        .append(System.lineSeparator())
-                        .append("Salary  : ")
-                        .append(teacher.getSalary())
-                        .append(System.lineSeparator());
+                report.append("--------------------------------\n")
+                      .append("ID      : ").append(teacher.getTeacherId()).append("\n")
+                      .append("Name    : ").append(teacher.getName()).append("\n")
+                      .append("Subject : ").append(teacher.getSubject()).append("\n")
+                      .append("Salary  : ").append(teacher.getSalary()).append("\n");
             }
-
-            report.append("===== TEACHER REPORT END =====")
-                    .append(System.lineSeparator());
 
             FileUtil.writeToFile(
                     "reports/teacher-report.txt",
                     report.toString()
             );
-
-            System.out.println("Teacher report generation completed.");
         });
     }
 
+    // ================= NEW REPORTS =================
+
+    @Override
+    public void generateStudentByCourseReportAsync() {
+
+        executor.submit(() -> {
+
+            StringBuilder report = new StringBuilder();
+
+            report.append("===== STUDENT BY COURSE REPORT =====\n")
+                  .append("Generated At: ")
+                  .append(LocalDateTime.now())
+                  .append("\n\n");
+
+            Map<Integer, List<Student>> grouped =
+                    studentService.getStudentsGroupedByCourse();
+
+            grouped.forEach((courseId, students) -> {
+                report.append("Course ID: ").append(courseId).append("\n");
+                students.forEach(s ->
+                        report.append("  - ")
+                              .append(s.getStudentId())
+                              .append(" : ")
+                              .append(s.getName())
+                              .append("\n")
+                );
+                report.append("\n");
+            });
+
+            FileUtil.writeToFile(
+                    "reports/student-by-course-report.txt",
+                    report.toString()
+            );
+        });
+    }
+
+    @Override
+    public void generatePendingFeesReportAsync() {
+
+        executor.submit(() -> {
+
+            StringBuilder report = new StringBuilder();
+
+            report.append("===== PENDING FEES REPORT =====\n")
+                  .append("Generated At: ")
+                  .append(LocalDateTime.now())
+                  .append("\n\n");
+
+            paymentService.getStudentsWithPendingFees()
+                    .forEach(id ->
+                            report.append("Student ID: ")
+                                  .append(id)
+                                  .append("\n")
+                    );
+
+            FileUtil.writeToFile(
+                    "reports/pending-fees-report.txt",
+                    report.toString()
+            );
+        });
+    }
+
+    @Override
+    public void generateLowAttendanceReportAsync(double threshold) {
+
+        executor.submit(() -> {
+
+            StringBuilder report = new StringBuilder();
+
+            report.append("===== LOW ATTENDANCE REPORT =====\n")
+                  .append("Threshold: ").append(threshold).append("%\n")
+                  .append("Generated At: ")
+                  .append(LocalDateTime.now())
+                  .append("\n\n");
+
+            attendanceService
+                    .getStudentsBelowAttendance(threshold)
+                    .forEach(id ->
+                            report.append("Student ID: ")
+                                  .append(id)
+                                  .append("\n")
+                    );
+
+            FileUtil.writeToFile(
+                    "reports/low-attendance-report.txt",
+                    report.toString()
+            );
+        });
+    }
+
+    @Override
+    public void generateTeacherCourseMappingReportAsync() {
+
+        executor.submit(() -> {
+
+            StringBuilder report = new StringBuilder();
+
+            report.append("===== TEACHER COURSE MAPPING =====\n")
+                  .append("Generated At: ")
+                  .append(LocalDateTime.now())
+                  .append("\n\n");
+
+            teacherService.getTeacherCourseMapping()
+                    .forEach((teacher, course) ->
+                            report.append(teacher)
+                                  .append(" -> ")
+                                  .append(course)
+                                  .append("\n")
+                    );
+
+            FileUtil.writeToFile(
+                    "reports/teacher-course-mapping-report.txt",
+                    report.toString()
+            );
+        });
+    }
+
+    // ================= ALL =================
+
+    @Override
+    public void generateAllReportsAsync() {
+        generateStudentReportAsync();
+        generateTeacherReportAsync();
+        generateStudentByCourseReportAsync();
+        generatePendingFeesReportAsync();
+        generateLowAttendanceReportAsync(75);
+        generateTeacherCourseMappingReportAsync();
+    }
+
+    @Override
     public void shutdown() {
 
         executor.shutdown();
-
         try {
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
                 executor.shutdownNow();

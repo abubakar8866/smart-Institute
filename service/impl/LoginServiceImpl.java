@@ -1,20 +1,16 @@
 package service.impl;
 
 import model.User;
-import dao.UserStore;
-import exception.InvalidLoginException;
 import service.LoginService;
-import util.PasswordUtil;
-import util.ValidationUtil;
-import util.FileUtil;
+import exception.InvalidLoginException;
+import util.*;
+
+import java.util.Map;
 
 public class LoginServiceImpl implements LoginService {
 
-    private final UserStore userStore;
-
-    public LoginServiceImpl(UserStore userStore) {
-        this.userStore = userStore;
-    }
+    // Share same storage
+    private static final Map<String, User> USERS = RegistrationServiceImpl.USERS;
 
     @Override
     public User login(String username, String password) {
@@ -23,28 +19,22 @@ public class LoginServiceImpl implements LoginService {
             !ValidationUtil.isNotBlank(password)) {
 
             throw new InvalidLoginException(
-                    "Username and password cannot be empty");
+                    "Invalid username or password");
         }
 
         username = username.trim();
         password = password.trim();
 
-        User user = userStore.findByUsername(username);
+        User user = USERS.get(username);
 
-        if (user == null) {
+        if (user == null ||
+            !user.getPassword().equals(
+                PasswordUtil.hashPassword(password))) {
+
             throw new InvalidLoginException(
                     "Invalid username or password");
         }
 
-        String hashedInputPassword =
-                PasswordUtil.hashPassword(password);
-
-        if (!user.getPassword().equals(hashedInputPassword)) {
-            throw new InvalidLoginException(
-                    "Invalid username or password");
-        }
-
-        // Optional: Log successful login
         FileUtil.writeToFile(
                 "data/login-logs.txt",
                 "LOGIN SUCCESS: " + user.getUsername()

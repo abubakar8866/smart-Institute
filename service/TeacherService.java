@@ -1,6 +1,7 @@
 package service;
 
 import java.util.List;
+import java.util.Map;
 
 import model.Teacher;
 
@@ -14,5 +15,7 @@ public interface TeacherService {
     void updateTeacher(Integer teacherId, Teacher updatedTeacher);
 
     void deleteTeacher(Integer teacherId);
+    
+    Map<Integer, String> getTeacherCourseMapping();
 	
 }

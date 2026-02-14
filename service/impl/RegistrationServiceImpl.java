@@ -1,71 +1,38 @@
 package service.impl;
 
 import model.User;
-import dao.UserStore;
 import service.RegistrationService;
-import util.PasswordUtil;
-import util.IdGenerator;
-import util.ValidationUtil;
-import util.FileUtil;
+import util.*;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class RegistrationServiceImpl implements RegistrationService {
 
-    private final UserStore userStore;
+	static final Map<String, User> USERS = new ConcurrentHashMap<>();
 
-    public RegistrationServiceImpl(UserStore userStore) {
-        this.userStore = userStore;
-    }
+	@Override
+	public void registerUser(String username, String password, String role) {
 
-    @Override
-    public void registerUser(String username,
-                             String password,
-                             String role) {
+		if (!ValidationUtil.isNotBlank(username) || !ValidationUtil.isNotBlank(password) || !ValidationUtil.isNotBlank(role)) {
+			throw new IllegalArgumentException("Invalid input");
+		}
 
-        if (!ValidationUtil.isNotBlank(username)) {
-            throw new IllegalArgumentException("Invalid username");
-        }
+		username = username.trim();
 
-        if (!ValidationUtil.isNotBlank(password)) {
-            throw new IllegalArgumentException("Password cannot be empty");
-        }
+		if (USERS.containsKey(username)) {
+			throw new IllegalArgumentException("Username already exists");
+		}
 
-        if (!ValidationUtil.isNotBlank(role)) {
-            throw new IllegalArgumentException("Role cannot be empty");
-        }
+		User user = new User(IdGenerator.generateId(), username, PasswordUtil.hashPassword(password), role.trim());
 
-        // Check if already exists
-        if (userStore.findByUsername(username) != null) {
-            throw new IllegalArgumentException("Username already exists");
-        }
+		USERS.put(username, user);
 
-        Integer userId = IdGenerator.generateId();
+		FileUtil.writeToFile("data/users.txt", user.toString());
+	}
 
-        String hashedPassword =
-                PasswordUtil.hashPassword(password);
-
-        User user = new User(
-                userId,
-                username,
-                hashedPassword,
-                role
-        );
-
-        userStore.save(user);
-
-        FileUtil.writeToFile(
-                "data/users.txt",
-                user.toString()
-        );
-    }
-
-    @Override
-    public User getUserByUsername(String username) {
-
-        if (!ValidationUtil.isNotBlank(username)) {
-            throw new IllegalArgumentException(
-                    "Username cannot be null or blank");
-        }
-
-        return userStore.findByUsername(username);
-    }
+	@Override
+	public User getUserByUsername(String username) {
+		return USERS.get(username);
+	}
 }

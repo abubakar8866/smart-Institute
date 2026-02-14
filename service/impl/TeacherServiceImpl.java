@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import exception.TeacherNotFoundException;
 
@@ -97,7 +98,18 @@ public class TeacherServiceImpl implements TeacherService {
 
         FileUtil.writeToFile(TEACHER_LOG,
                 "DELETED: " + teacherId);
-    }    
+    }  
+    
+    @Override
+    public Map<Integer, String> getTeacherCourseMapping() {
+
+        return teacherMap.values()
+                .stream()
+                .collect(Collectors.toMap(
+                        Teacher::getTeacherId,
+                        Teacher::getSubject
+                ));
+    }
 
     private void validateTeacher(Teacher teacher) {
 

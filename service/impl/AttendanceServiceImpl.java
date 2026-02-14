@@ -85,6 +85,26 @@ public class AttendanceServiceImpl implements AttendanceService {
 
         return percentage;
     }
+    
+    @Override
+    public List<Integer> getStudentsBelowAttendance(double threshold) {
+
+        return attendanceMap.entrySet()
+                .stream()
+                .filter(e -> {
+                    long present =
+                            e.getValue().stream()
+                                    .filter(Attendance::getPresent)
+                                    .count();
+
+                    double percent =
+                            (present * 100.0) / e.getValue().size();
+
+                    return percent < threshold;
+                })
+                .map(Map.Entry::getKey)
+                .toList();
+    }
 
     private void validateStudentId(Integer studentId) {
         if (studentId == null) {

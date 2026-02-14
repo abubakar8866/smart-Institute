@@ -17,4 +17,6 @@ public interface PaymentService {
     void updatePaymentStatus(Integer paymentId, String status);
 
     void deletePayment(Integer paymentId);
+    
+    List<Integer> getStudentsWithPendingFees();
 }

@@ -1,13 +1,15 @@
 package model;
 
+import java.math.BigDecimal;
+
 public class Course {
 
     private final Integer courseId;
     private String courseName;
     private Integer duration;
-    private Double fees;
+    private BigDecimal fees;
 
-    public Course(Integer courseId, String courseName, Integer duration, Double fees) {
+    public Course(Integer courseId, String courseName, Integer duration, BigDecimal fees) {
         this.courseId = courseId;
         this.courseName = courseName;
         this.duration = duration;
@@ -34,11 +36,11 @@ public class Course {
         this.duration = duration;
     }
 
-    public Double getFees() {
+    public BigDecimal getFees() {
         return fees;
     }
     
-    public void setFees(Double fees) {
+    public void setFees(BigDecimal fees) {
         this.fees = fees;
     }
 
