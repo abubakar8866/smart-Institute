@@ -4,6 +4,9 @@ import model.Attendance;
 import service.AttendanceService;
 import util.FileUtil;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,7 +20,97 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final Map<Integer, List<Attendance>> attendanceMap =
             new ConcurrentHashMap<>();
 
-    private static final String ATTENDANCE_FILE = "data/attendance.txt";
+    private static final String ATTENDANCE_FILE = "data/attendance.csv";
+    
+    private static final String REPORT_FILE = "data/attendance-report.csv";
+    
+    private void ensureReportHeader() {
+
+        File file = new File(REPORT_FILE);
+
+        if (!file.exists() || file.length() == 0) {
+            FileUtil.writeToFile(REPORT_FILE,
+                    "studentId,attendancePercentage");
+        }
+    }
+    
+    private void loadAttendanceFromFile() {
+
+        File file = new File(ATTENDANCE_FILE);
+
+        if (!file.exists() || file.length() == 0) {
+            return; // nothing to load
+        }
+
+        try (BufferedReader reader =
+                     new BufferedReader(new FileReader(file))) {
+
+            String line;
+            boolean isFirstLine = true;
+
+            while ((line = reader.readLine()) != null) {
+
+                // Skip header
+                if (isFirstLine) {
+                    isFirstLine = false;
+                    continue;
+                }
+
+                String[] parts = line.split(",");
+
+                Integer studentId = Integer.parseInt(parts[0]);
+                LocalDate date = LocalDate.parse(parts[1]);
+                Boolean present = Boolean.parseBoolean(parts[2]);
+
+                Attendance attendance =
+                        new Attendance(studentId, date, present);
+
+                attendanceMap
+                        .computeIfAbsent(studentId,
+                                k -> new CopyOnWriteArrayList<>())
+                        .add(attendance);
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error loading attendance file", e);
+        }
+    }
+
+    
+    public AttendanceServiceImpl() {
+        loadAttendanceFromFile();
+    }
+    
+    private void validateStudentId(Integer studentId) {
+        if (studentId == null) {
+            throw new IllegalArgumentException(
+                    "StudentId cannot be null");
+        }
+    }
+    
+    private void rewriteAttendanceFile() {
+
+        StringBuilder builder = new StringBuilder();
+
+        // Add header
+        builder.append("studentId,date,present")
+               .append(System.lineSeparator());
+
+        for (Map.Entry<Integer, List<Attendance>> entry : attendanceMap.entrySet()) {
+
+            for (Attendance attendance : entry.getValue()) {
+
+                builder.append(attendance.getStudentId())
+                       .append(",")
+                       .append(attendance.getDate())
+                       .append(",")
+                       .append(attendance.getPresent())
+                       .append(System.lineSeparator());
+            }
+        }
+
+        FileUtil.overwriteFile(ATTENDANCE_FILE, builder.toString());
+    }
 
     @Override
     public void markAttendance(Integer studentId, boolean present) {
@@ -45,9 +138,7 @@ public class AttendanceServiceImpl implements AttendanceService {
 
         records.add(attendance);
 
-        // Save record to file
-        FileUtil.writeToFile(ATTENDANCE_FILE,
-                formatAttendance(attendance));
+        rewriteAttendanceFile();
 
         // Log action
         FileUtil.writeToFile("data/attendance-logs.txt",
@@ -77,11 +168,11 @@ public class AttendanceServiceImpl implements AttendanceService {
         double percentage =
                 (presentCount * 100.0) / records.size();
 
-        // Generate report entry
-        FileUtil.writeToFile("data/attendance-report.txt",
-                "Student: " + studentId +
-                        " | Attendance: " +
-                        String.format("%.2f", percentage) + "%");
+        ensureReportHeader();
+
+        FileUtil.writeToFile(REPORT_FILE,
+                studentId + "," +
+                String.format("%.2f", percentage));
 
         return percentage;
     }
@@ -105,17 +196,5 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .map(Map.Entry::getKey)
                 .toList();
     }
-
-    private void validateStudentId(Integer studentId) {
-        if (studentId == null) {
-            throw new IllegalArgumentException(
-                    "StudentId cannot be null");
-        }
-    }
-
-    private String formatAttendance(Attendance attendance) {
-        return attendance.getStudentId() + "," +
-                attendance.getDate() + "," +
-                attendance.getPresent();
-    }
+    
 }

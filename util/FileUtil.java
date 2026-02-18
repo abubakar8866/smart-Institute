@@ -47,4 +47,26 @@ public final class FileUtil {
 
         return content.toString();
     }
+    
+    public static void overwriteFile(String filePath, String data) {
+
+        try {
+            File file = new File(filePath);
+
+            File parent = file.getParentFile();
+            if (parent != null && !parent.exists()) {
+                parent.mkdirs();
+            }
+
+            try (BufferedWriter writer =
+                         new BufferedWriter(new FileWriter(file, false))) {
+
+                writer.write(data);
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException("Error overwriting file: " + filePath, e);
+        }
+    }
+    
 }
