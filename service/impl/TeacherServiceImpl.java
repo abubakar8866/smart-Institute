@@ -4,11 +4,14 @@ import model.Teacher;
 import service.TeacherService;
 import util.ValidationUtil;
 import util.FileUtil;
+import util.IdGenerator;
 
 import java.io.File;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -39,21 +42,27 @@ public class TeacherServiceImpl implements TeacherService {
 
 			String[] lines = content.split("\\R");
 
-			for (String line : lines) {
+			for (int i = 1; i < lines.length; i++) {
 
-				String[] parts = line.split(",");
+				String[] parts = lines[i].split(",");
 
 				if (parts.length != 4)
 					continue;
 
-				Integer id = Integer.parseInt(parts[0]);
-				String name = parts[1];
-				String subject = parts[2];
-				Double salary = Double.parseDouble(parts[3]);
+				Integer id = Integer.parseInt(parts[0].trim());
+				String name = parts[1].trim();
+				String subject = parts[2].trim();
+				BigDecimal salary = new BigDecimal(parts[3].trim());
 
 				Teacher teacher = new Teacher(id, name, subject, salary);
-
 				teacherMap.put(id, teacher);
+			}
+
+			if (!teacherMap.isEmpty()) {
+
+				Integer maxId = teacherMap.keySet().stream().max(Integer::compareTo).orElse(1000);
+
+				IdGenerator.initialize(maxId);
 			}
 
 		} catch (Exception e) {
@@ -97,13 +106,9 @@ public class TeacherServiceImpl implements TeacherService {
 
 		validateId(teacherId);
 
-		Teacher teacher = teacherMap.get(teacherId);
+		return Optional.ofNullable(teacherMap.get(teacherId))
+				.orElseThrow(() -> new TeacherNotFoundException("Teacher not found with id: " + teacherId));
 
-		if (teacher == null) {
-			throw new TeacherNotFoundException("Teacher not found with id: " + teacherId);
-		}
-
-		return teacher;
 	}
 
 	@Override
@@ -128,6 +133,8 @@ public class TeacherServiceImpl implements TeacherService {
 
 			return existing;
 		});
+
+		rewriteTeachersFile();
 
 		FileUtil.writeToFile(TEACHER_LOG, "UPDATED: " + teacherId);
 	}
@@ -158,7 +165,7 @@ public class TeacherServiceImpl implements TeacherService {
 
 		if (teacher == null || !ValidationUtil.isNotBlank(teacher.getName())
 				|| !ValidationUtil.isNotBlank(teacher.getSubject()) || teacher.getSalary() == null
-				|| teacher.getSalary() <= 0) {
+				|| teacher.getSalary() == null || teacher.getSalary().compareTo(BigDecimal.ZERO) <= 0) {
 
 			throw new IllegalArgumentException("Invalid teacher data");
 		}

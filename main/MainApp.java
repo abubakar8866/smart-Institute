@@ -97,23 +97,25 @@ public class MainApp {
 
 	private void showDashboard(User user) {
 
-		while (true) {
+		boolean loggedIn = true;
+
+		while (loggedIn) {
 
 			System.out.println("\n=== DASHBOARD ===");
 			System.out.println("Welcome " + user.getUsername());
 			System.out.println("Role: " + user.getRole());
 
 			if (user.getRole() == Role.ADMIN) {
-				showAdminMenu(user);
+				loggedIn = showAdminMenu(user);
 			} else {
-				showUserMenu(user);
+				loggedIn = showUserMenu(user);
 			}
 		}
 	}
 
 	// ================= ADMIN MENU =================
 
-	private void showAdminMenu(User user) {
+	private boolean showAdminMenu(User user) {
 
 		System.out.println("1. View Profile");
 		System.out.println("2. View All Users");
@@ -127,15 +129,17 @@ public class MainApp {
 		case 2 -> viewAllUsers();
 		case 3 -> {
 			System.out.println("Logged out successfully ✅");
-			return;
+			return false;
 		}
 		default -> System.out.println("Invalid option.");
 		}
+
+		return true;
 	}
 
 	// ================= USER MENU =================
 
-	private void showUserMenu(User user) {
+	private boolean showUserMenu(User user) {
 
 		System.out.println("1. View Profile");
 		System.out.println("2. Logout");
@@ -147,10 +151,12 @@ public class MainApp {
 		case 1 -> printProfile(user);
 		case 2 -> {
 			System.out.println("Logged out successfully ✅");
-			return;
+			return false;
 		}
 		default -> System.out.println("Invalid option.");
 		}
+
+		return true;
 	}
 
 	// ================= COMMON METHODS =================

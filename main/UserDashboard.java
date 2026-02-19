@@ -20,95 +20,91 @@ import java.util.Scanner;
 
 public class UserDashboard {
 
-    private final User user;
-    private final Scanner sc = new Scanner(System.in);
+	private final User user;
+	private final Scanner sc = new Scanner(System.in);
 
-    // REAL services
-    private final AttendanceService attendanceService = new AttendanceServiceImpl();
-    private final CourseService courseService = new CourseServiceImpl();
-    private final PaymentService paymentService = new PaymentServiceImpl(courseService);
+	// REAL services
+	private final AttendanceService attendanceService = new AttendanceServiceImpl();
+	private final CourseService courseService = new CourseServiceImpl();
+	private final PaymentService paymentService = new PaymentServiceImpl(courseService);
 
-    private final StudentService studentService = new StudentServiceImpl();
+	private final StudentService studentService = new StudentServiceImpl(paymentService, attendanceService);
 
-    public UserDashboard(User user) {
-        this.user = user;
-    }
+	public UserDashboard(User user) {
+		this.user = user;
+	}
 
-    public void start() {
+	public void start() {
 
-        boolean running = true;
+		boolean running = true;
 
-        while (running) {
-            System.out.println("""
-                    --- USER DASHBOARD ---
-                    1. View Attendance %
-                    2. View Pending Fees
-                    0. Logout
-                    """);
+		while (running) {
+			System.out.println("""
+					--- USER DASHBOARD ---
+					1. View Attendance %
+					2. View Pending Fees
+					0. Logout
+					""");
 
-            System.out.print("Choose: ");
-            int choice = Integer.parseInt(sc.nextLine());
+			System.out.print("Choose: ");
+			int choice = Integer.parseInt(sc.nextLine());
 
-            switch (choice) {
-                case 1 -> viewAttendance();
-                case 2 -> viewPendingFees();
-                case 0 -> running = false;
-                default -> System.out.println("Invalid choice");
-            }
-        }
-    }
+			switch (choice) {
+			case 1 -> viewAttendance();
+			case 2 -> viewPendingFees();
+			case 0 -> running = false;
+			default -> System.out.println("Invalid choice");
+			}
+		}
+	}
 
-    private void viewAttendance() {
-        double percentage =
-                attendanceService
-                        .calculateAttendancePercentage(
-                                user.getUserId());
+	private void viewAttendance() {
 
-        System.out.println("Attendance: " + percentage + "%");
-    }
+		Student student = studentService.getStudentById(user.getUserId());
 
-    private void viewPendingFees() {
+		if (student == null) {
+			System.out.println("Student not found");
+			return;
+		}
 
-        // 1️⃣ Get student
-        Student student =
-                studentService.getStudentById(
-                        user.getUserId());
+		double percentage = attendanceService.calculateAttendancePercentage(student.getStudentId());
 
-        if (student == null) {
-            System.out.println("Student not found");
-            return;
-        }
+		System.out.println("Attendance: " + percentage + "%");
+	}
 
-        // 2️⃣ Get course
-        Course course =
-                courseService.getCourseById(
-                        student.getCourseId());
+	private void viewPendingFees() {
 
-        if (course == null) {
-            System.out.println("Course not found");
-            return;
-        }
+		// 1️⃣ Get student
+		Student student = studentService.getStudentById(user.getUserId());
 
-        BigDecimal courseFee = course.getFees();
+		if (student == null) {
+			System.out.println("Student not found");
+			return;
+		}
 
-        // 3️⃣ Sum successful payments
-        List<Payment> payments =
-                paymentService.getPaymentsByStudent(
-                        student.getStudentId());
+		// 2️⃣ Get course
+		Course course = courseService.getCourseById(student.getCourseId());
 
-        BigDecimal totalPaid = payments.stream()
-                .filter(p -> p.getStatus() == PaymentStatus.SUCCESS)
-                .map(Payment::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+		if (course == null) {
+			System.out.println("Course not found");
+			return;
+		}
 
-        // 4️⃣ Pending = Course Fee - Paid
-        BigDecimal pending =
-                courseFee.subtract(totalPaid);
+		BigDecimal courseFee = course.getFees();
 
-        if (pending.compareTo(BigDecimal.ZERO) < 0) {
-            pending = BigDecimal.ZERO;
-        }
+		// 3️⃣ Sum successful payments
+		List<Payment> payments = paymentService.getPaymentsByStudent(student.getStudentId());
 
-        System.out.println("Pending Fees: ₹" + pending);
-    }
+		BigDecimal totalPaid = payments.stream().filter(p -> p.getStatus() == PaymentStatus.SUCCESS)
+				.map(Payment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+		// 4️⃣ Pending = Course Fee - Paid
+		BigDecimal pending = courseFee.subtract(totalPaid);
+
+		if (pending.compareTo(BigDecimal.ZERO) < 0) {
+			pending = BigDecimal.ZERO;
+		}
+
+		System.out.println("Pending Fees: ₹" + pending);
+	}
 }

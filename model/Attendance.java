@@ -6,9 +6,9 @@ public class Attendance {
 
     private final Integer studentId;
     private LocalDate date;
-    private Boolean present;
+    private boolean present;
 
-    public Attendance(Integer studentId, LocalDate date, Boolean present) {
+    public Attendance(Integer studentId, LocalDate date, boolean present) {
         this.studentId = studentId;
         this.date = date;
         this.present = present;
@@ -26,11 +26,11 @@ public class Attendance {
         this.date = date;
     }
 
-    public Boolean getPresent() {
+    public boolean getPresent() {
         return present;
     }
     
-    public void setPresent(Boolean present) {
+    public void setPresent(boolean present) {
         this.present = present;
     }
 

@@ -25,8 +25,10 @@ public class LoginServiceImpl implements LoginService {
 
 		User user = USERS.get(username);
 
-		if (user == null || !PasswordUtil.hashPassword(password).equals(user.getPassword())) {
+		String hashedInput = PasswordUtil.hashPassword(password);
 
+		if (user == null || !hashedInput.equals(user.getPassword())) {
+			FileUtil.writeToFile("data/login-logs.txt", "LOGIN FAILED: " + username);
 			throw new InvalidLoginException("Invalid username or password");
 		}
 

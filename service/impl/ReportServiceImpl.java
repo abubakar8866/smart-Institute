@@ -3,11 +3,12 @@ package service.impl;
 import model.Student;
 import model.Teacher;
 import model.Payment;
+import model.PaymentStatus;
 import service.*;
 import util.FileUtil;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
@@ -21,7 +22,7 @@ public class ReportServiceImpl implements ReportService {
 
 	private final ExecutorService executor = new ThreadPoolExecutor(2, 4, 60L, TimeUnit.SECONDS,
 			new LinkedBlockingQueue<>());
-	
+
 	private static final String REPORT_FOLDER = "reports/";
 
 	public ReportServiceImpl(StudentService studentService, TeacherService teacherService,
@@ -31,19 +32,25 @@ public class ReportServiceImpl implements ReportService {
 		this.teacherService = teacherService;
 		this.attendanceService = attendanceService;
 		this.paymentService = paymentService;
+
+		new java.io.File(REPORT_FOLDER).mkdirs();
 	}
 
 	private void writeReport(String path, String content) {
-		FileUtil.writeToFile(path, content);
+		FileUtil.overwriteFile(path, content);
 	}
 
 	private void runAsync(Runnable task) {
+
+		if (executor.isShutdown()) {
+			throw new IllegalStateException("ReportService already shutdown");
+		}
+
 		executor.submit(() -> {
 			try {
 				task.run();
 			} catch (Exception e) {
 				System.err.println("Report generation failed: " + e.getMessage());
-				e.printStackTrace();
 			}
 		});
 	}
@@ -57,8 +64,8 @@ public class ReportServiceImpl implements ReportService {
 
 			StringBuilder report = new StringBuilder(2048);
 
-			report.append("===== STUDENT REPORT =====\n").append("Generated At: ").append(LocalDateTime.now())
-					.append("\n\n");
+			report.append("===== STUDENT REPORT =====\n").append("Generated At: ")
+					.append(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).append("\n\n");
 
 			for (Student student : studentService.getAllStudents()) {
 
@@ -71,7 +78,8 @@ public class ReportServiceImpl implements ReportService {
 				}
 
 				BigDecimal totalPaid = paymentService.getPaymentsByStudent(student.getStudentId()).stream()
-						.map(Payment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+						.filter(p -> p.getStatus() == PaymentStatus.SUCCESS).map(Payment::getAmount)
+						.reduce(BigDecimal.ZERO, BigDecimal::add);
 
 				report.append("--------------------------------\n").append("ID           : ")
 						.append(student.getStudentId()).append("\n").append("Name         : ").append(student.getName())
@@ -91,8 +99,8 @@ public class ReportServiceImpl implements ReportService {
 
 			StringBuilder report = new StringBuilder(2048);
 
-			report.append("===== TEACHER REPORT =====\n").append("Generated At: ").append(LocalDateTime.now())
-					.append("\n\n");
+			report.append("===== TEACHER REPORT =====\n").append("Generated At: ")
+					.append(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).append("\n\n");
 
 			for (Teacher teacher : teacherService.getAllTeachers()) {
 
@@ -115,8 +123,8 @@ public class ReportServiceImpl implements ReportService {
 
 			StringBuilder report = new StringBuilder(2048);
 
-			report.append("===== STUDENT BY COURSE REPORT =====\n").append("Generated At: ").append(LocalDateTime.now())
-					.append("\n\n");
+			report.append("===== STUDENT BY COURSE REPORT =====\n").append("Generated At: ")
+					.append(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).append("\n\n");
 
 			Map<Integer, List<Student>> grouped = studentService.getStudentsGroupedByCourse();
 
@@ -138,8 +146,8 @@ public class ReportServiceImpl implements ReportService {
 
 			StringBuilder report = new StringBuilder(2048);
 
-			report.append("===== PENDING FEES REPORT =====\n").append("Generated At: ").append(LocalDateTime.now())
-					.append("\n\n");
+			report.append("===== PENDING FEES REPORT =====\n").append("Generated At: ")
+					.append(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).append("\n\n");
 
 			paymentService.getStudentsWithPendingFees()
 					.forEach(id -> report.append("Student ID: ").append(id).append("\n"));
@@ -156,7 +164,7 @@ public class ReportServiceImpl implements ReportService {
 			StringBuilder report = new StringBuilder(2048);
 
 			report.append("===== LOW ATTENDANCE REPORT =====\n").append("Threshold: ").append(threshold).append("%\n")
-					.append("Generated At: ").append(LocalDateTime.now()).append("\n\n");
+					.append("Generated At: ").append(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).append("\n\n");
 
 			attendanceService.getStudentsBelowAttendance(threshold)
 					.forEach(id -> report.append("Student ID: ").append(id).append("\n"));
@@ -172,8 +180,8 @@ public class ReportServiceImpl implements ReportService {
 
 			StringBuilder report = new StringBuilder(2048);
 
-			report.append("===== TEACHER COURSE MAPPING =====\n").append("Generated At: ").append(LocalDateTime.now())
-					.append("\n\n");
+			report.append("===== TEACHER COURSE MAPPING =====\n").append("Generated At: ")
+					.append(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).append("\n\n");
 
 			teacherService.getTeacherCourseMapping()
 					.forEach((teacher, course) -> report.append(teacher).append(" -> ").append(course).append("\n"));
@@ -186,12 +194,15 @@ public class ReportServiceImpl implements ReportService {
 
 	@Override
 	public void generateAllReportsAsync() {
-		generateStudentReportAsync();
-		generateTeacherReportAsync();
-		generateStudentByCourseReportAsync();
-		generatePendingFeesReportAsync();
-		generateLowAttendanceReportAsync(75);
-		generateTeacherCourseMappingReportAsync();
+
+		runAsync(() -> {
+			generateStudentReportAsync();
+			generateTeacherReportAsync();
+			generateStudentByCourseReportAsync();
+			generatePendingFeesReportAsync();
+			generateLowAttendanceReportAsync(75);
+			generateTeacherCourseMappingReportAsync();
+		});
 	}
 
 	@Override

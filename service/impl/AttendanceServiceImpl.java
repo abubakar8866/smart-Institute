@@ -42,7 +42,7 @@ public class AttendanceServiceImpl implements AttendanceService {
 					continue;
 				}
 
-				String[] parts = line.split(",");
+				String[] parts = line.trim().split(",");
 
 				if (parts.length != 3)
 					continue;
@@ -140,7 +140,10 @@ public class AttendanceServiceImpl implements AttendanceService {
 		return attendanceMap.entrySet().stream().filter(e -> {
 			long present = e.getValue().stream().filter(Attendance::getPresent).count();
 
-			double percent = (present * 100.0) / e.getValue().size();
+			int total = e.getValue().size();
+			if (total == 0)
+				return false;
+			double percent = (present * 100.0) / total;
 
 			return percent < threshold;
 		}).map(Map.Entry::getKey).toList();

@@ -1,216 +1,188 @@
 package service.impl;
 
 import model.Student;
+import model.StudentReport;
 import service.StudentService;
+import service.PaymentService;
+import service.AttendanceService;
 import util.ValidationUtil;
 import util.FileUtil;
+import util.IdGenerator;
+import exception.StudentNotFoundException;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.math.BigDecimal;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-import exception.StudentNotFoundException;
-
 public class StudentServiceImpl implements StudentService {
 
-    private static final Map<Integer, Student> studentMap =
-            new ConcurrentHashMap<>();
-    
-    private static final String STUDENT_FILE = "data/students.csv";
-    private static final String STUDENT_LOG = "data/student-logs.txt";
-    
-    static {
-        loadStudentsFromFile();
-    }
-    
-    private static void loadStudentsFromFile() {
+	private static final Map<Integer, Student> studentMap = new ConcurrentHashMap<>();
 
-        try {
+	private final PaymentService paymentService;
+	private final AttendanceService attendanceService;
 
-            File file = new File(STUDENT_FILE);
-            if (!file.exists())
-                return;
+	private static final String STUDENT_FILE = "data/students.csv";
+	private static final String STUDENT_LOG = "data/student-logs.txt";
 
-            String content = FileUtil.readFile(STUDENT_FILE);
-            if (content.isBlank())
-                return;
+	public StudentServiceImpl(PaymentService paymentService, AttendanceService attendanceService) {
 
-            String[] lines = content.split("\\R");
+		this.paymentService = paymentService;
+		this.attendanceService = attendanceService;
 
-            for (String line : lines) {
+		loadStudentsFromFile();
+	}
 
-                String[] parts = line.split(",");
+	private void loadStudentsFromFile() {
 
-                if (parts.length != 6)
-                    continue;
+		File file = new File(STUDENT_FILE);
+		if (!file.exists())
+			return;
 
-                Integer id = Integer.parseInt(parts[0]);
-                String name = parts[1];
-                String email = parts[2];
-                Integer courseId = Integer.parseInt(parts[3]);
-                Double feesPaid = Double.parseDouble(parts[4]);
-                Double attendance = Double.parseDouble(parts[5]);
+		String content = FileUtil.readFile(STUDENT_FILE);
+		if (content.isBlank())
+			return;
 
-                Student student =
-                        new Student(id,name, email, courseId,
-                                    feesPaid, attendance);
+		String[] lines = content.split("\\R");
 
-                studentMap.put(id, student);
-            }
+		for (int i = 1; i < lines.length; i++) { // skip header
 
-        } catch (Exception e) {
-            System.out.println("Error loading students: " + e.getMessage());
-        }
-    }
-    
-    private static void rewriteStudentsFile() {
+			String[] parts = lines[i].split(",");
+			if (parts.length != 4)
+				continue;
 
-        StringBuilder sb = new StringBuilder();
+			Integer id = Integer.parseInt(parts[0].trim());
+			String name = parts[1].trim();
+			String email = parts[2].trim();
+			Integer courseId = Integer.parseInt(parts[3].trim());
 
-        for (Student student : studentMap.values()) {
+			studentMap.put(id, new Student(id, name, email, courseId));
+		}
 
-            sb.append(student.getStudentId()).append(",")
-              .append(student.getName()).append(",")
-              .append(student.getEmail()).append(",")
-              .append(student.getCourseId()).append(",")
-              .append(student.getFeesPaid()).append(",")
-              .append(student.getAttendancePercentage())
-              .append(System.lineSeparator());
-        }
+		if (!studentMap.isEmpty()) {
 
-        FileUtil.overwriteFile(STUDENT_FILE, sb.toString());
-    }
+			Integer maxId = studentMap.values().stream().map(Student::getStudentId).max(Integer::compareTo)
+					.orElse(1000);
 
-    @Override
-    public void addStudent(Student student) {
+			IdGenerator.initialize(maxId);
+		}
+	}
 
-        validateStudent(student);
+	private void rewriteStudentsFile() {
 
-        if (studentMap.putIfAbsent(
-                student.getStudentId(), student) != null) {
+		StringBuilder sb = new StringBuilder();
 
-            throw new IllegalArgumentException(
-                    "Student already exists with id: "
-                            + student.getStudentId());
-        }
+		sb.append("studentId,name,email,courseId").append(System.lineSeparator());
 
-        rewriteStudentsFile();
+		for (Student student : studentMap.values()) {
+			sb.append(student).append(System.lineSeparator());
+		}
 
-        FileUtil.writeToFile(STUDENT_LOG,
-                "ADDED: " + student.getStudentId());
-    }
+		FileUtil.overwriteFile(STUDENT_FILE, sb.toString());
+	}
 
-    @Override
-    public Student getStudentById(Integer studentId) {
+	@Override
+	public void addStudent(Student student) {
 
-        validateId(studentId);
+		validateStudent(student);
 
-        Student student = studentMap.get(studentId);
+		if (studentMap.putIfAbsent(student.getStudentId(), student) != null) {
 
-        if (student == null) {
-            throw new StudentNotFoundException(
-                    "Student not found with id: " + studentId);
-        }
+			throw new IllegalArgumentException("Student already exists with id: " + student.getStudentId());
+		}
 
-        return student;
-    }
+		rewriteStudentsFile();
 
-    @Override
-    public List<Student> getAllStudents() {
-        return new ArrayList<>(studentMap.values());
-    }
+		FileUtil.writeToFile(STUDENT_LOG, "ADDED: " + student.getStudentId());
+	}
 
-    @Override
-    public List<Student> getStudentsByCourse(Integer courseId) {
+	@Override
+	public Student getStudentById(Integer studentId) {
 
-        if (courseId == null) {
-            throw new IllegalArgumentException(
-                    "Course ID cannot be null");
-        }
+		validateId(studentId);
 
-        return studentMap.values()
-                .stream()
-                .filter(s -> courseId.equals(s.getCourseId()))
-                .collect(Collectors.toList());
-    }
+		Student student = studentMap.get(studentId);
 
-    @Override
-    public void updateStudent(Student updatedStudent) {
+		if (student == null) {
+			throw new StudentNotFoundException("Student not found with id: " + studentId);
+		}
 
-        validateStudent(updatedStudent);
+		return student;
+	}
 
-        studentMap.compute(
-                updatedStudent.getStudentId(),
-                (id, existing) -> {
+	@Override
+	public List<Student> getAllStudents() {
+		return new ArrayList<>(studentMap.values());
+	}
 
-                    if (existing == null) {
-                        throw new StudentNotFoundException(
-                                "Student not found with id: " + id);
-                    }
+	@Override
+	public void deleteStudent(Integer studentId) {
 
-                    existing.setName(updatedStudent.getName());
-                    existing.setEmail(updatedStudent.getEmail());
-                    existing.setCourseId(updatedStudent.getCourseId());
-                    existing.setFeesPaid(updatedStudent.getFeesPaid());
-                    existing.setAttendancePercentage(
-                            updatedStudent.getAttendancePercentage());
+		validateId(studentId);
 
-                    return existing;
-                }
-        );
+		Student removed = studentMap.remove(studentId);
 
-        rewriteStudentsFile();
-        
-        FileUtil.writeToFile(STUDENT_LOG,
-                "UPDATED: " + updatedStudent.getStudentId());
-    }
+		if (removed == null) {
+			throw new StudentNotFoundException("Student not found with id: " + studentId);
+		}
 
-    @Override
-    public void deleteStudent(Integer studentId) {
+		rewriteStudentsFile();
 
-        validateId(studentId);
+		FileUtil.writeToFile(STUDENT_LOG, "DELETED: " + studentId);
+	}
 
-        Student removed = studentMap.remove(studentId);
+	/* 🔥 NEW PROFESSIONAL METHOD */
 
-        if (removed == null) {
-            throw new StudentNotFoundException(
-                    "Student not found with id: " + studentId);
-        }
-        
-        rewriteStudentsFile();
+	public StudentReport getStudentReport(Integer studentId) {
 
-        FileUtil.writeToFile(STUDENT_LOG,
-                "DELETED: " + studentId);
-    }
+		Student student = getStudentById(studentId);
 
-    @Override
-    public Map<Integer, List<Student>> getStudentsGroupedByCourse() {
+		BigDecimal totalPaid = paymentService.getTotalPaidByStudent(studentId);
 
-        return studentMap.values()
-                .stream()
-                .collect(Collectors.groupingBy(Student::getCourseId));
-    }
-    
-    private void validateStudent(Student student) {
+		double attendance = attendanceService.calculateAttendancePercentage(studentId);
 
-        if (student == null ||
-            !ValidationUtil.isNotBlank(student.getName()) ||
-            !ValidationUtil.isValidEmail(student.getEmail()) ||
-            student.getCourseId() == null) {
+		return new StudentReport(student.getStudentId(), student.getName(), student.getEmail(), student.getCourseId(),
+				totalPaid, attendance);
+	}
 
-            throw new IllegalArgumentException(
-                    "Invalid student data");
-        }
-    }
+	private void validateStudent(Student student) {
 
-    private void validateId(Integer id) {
-        if (id == null) {
-            throw new IllegalArgumentException(
-                    "Student ID cannot be null");
-        }
-    }     
-    
+		if (student == null || !ValidationUtil.isNotBlank(student.getName())
+				|| !ValidationUtil.isValidEmail(student.getEmail()) || student.getCourseId() == null) {
+
+			throw new IllegalArgumentException("Invalid student data");
+		}
+	}
+
+	private void validateId(Integer id) {
+		if (id == null) {
+			throw new IllegalArgumentException("Student ID cannot be null");
+		}
+	}
+
+	@Override
+	public List<Student> getStudentsByCourse(Integer courseId) {
+
+		return studentMap.values().stream().filter(student -> student.getCourseId().equals(courseId)).toList();
+	}
+
+	@Override
+	public void updateStudent(Student student) {
+
+		if (!studentMap.containsKey(student.getStudentId())) {
+			throw new RuntimeException("Student not found with ID: " + student.getStudentId());
+		}
+
+		studentMap.put(student.getStudentId(), student);
+
+		rewriteStudentsFile();
+	}
+
+	@Override
+	public Map<Integer, List<Student>> getStudentsGroupedByCourse() {
+
+		return studentMap.values().stream().collect(Collectors.groupingBy(Student::getCourseId));
+	}
+
 }

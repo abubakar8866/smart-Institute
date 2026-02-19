@@ -11,135 +11,138 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class RegistrationServiceImpl implements RegistrationService {
 
-    private static final String USERS_FILE = "data/users.csv";
+	private static final String USERS_FILE = "data/users.csv";
 
-    static final Map<String, User> USERS = new ConcurrentHashMap<>();
+	static final Map<String, User> USERS = new ConcurrentHashMap<>();
 
-    static {
-        loadUsersFromFile();
-    }
+	static {
+		loadUsersFromFile();
+	}
 
-    // ================= LOAD =================
+	// ================= LOAD =================
 
-    private static void loadUsersFromFile() {
+	private static void loadUsersFromFile() {
 
-        try {
+		try {
 
-            File file = new File(USERS_FILE);
-            if (!file.exists())
-                return;
+			File file = new File(USERS_FILE);
+			if (!file.exists())
+				return;
 
-            String content = FileUtil.readFile(USERS_FILE);
-            if (content.isBlank())
-                return;
+			String content = FileUtil.readFile(USERS_FILE);
+			if (content.isBlank())
+				return;
 
-            String[] lines = content.split("\\R");
+			String[] lines = content.split("\\R");
 
-            boolean isFirstLine = true;
+			boolean isFirstLine = true;
 
-            for (String line : lines) {
+			for (String line : lines) {
 
-                if (isFirstLine) {   // skip header
-                    isFirstLine = false;
-                    continue;
-                }
+				if (isFirstLine) { // skip header
+					isFirstLine = false;
+					continue;
+				}
 
-                String[] parts = line.split(",");
+				String[] parts = line.split(",");
 
-                if (parts.length != 4)
-                    continue;
+				if (parts.length != 4)
+					continue;
 
-                Integer id = Integer.parseInt(parts[0]);
-                String username = parts[1];
-                String password = parts[2];
+				Integer id = Integer.parseInt(parts[0].trim());
+				String username = parts[1].trim();
+				String password = parts[2].trim();
 
-                Role role;
+				Role role;
 
-                try {
-                    role = Role.valueOf(parts[3].toUpperCase());
-                } catch (IllegalArgumentException e) {
-                    System.out.println("Invalid role in CSV: " + parts[3]);
-                    continue;
-                }
+				try {
+					role = Role.valueOf(parts[3].toUpperCase());
+				} catch (IllegalArgumentException e) {
+					System.out.println("Invalid role in CSV: " + parts[3]);
+					continue;
+				}
 
-                User user = new User(id, username, password, role);
-                USERS.put(username, user);
-            }
+				User user = new User(id, username, password, role);
+				USERS.put(username, user);
+			}
 
-        } catch (Exception e) {
-            System.out.println("Error loading users: " + e.getMessage());
-        }
-    }
+			if (!USERS.isEmpty()) {
 
-    // ================= REWRITE =================
+				Integer maxId = USERS.values().stream().map(User::getUserId).max(Integer::compareTo).orElse(1000);
 
-    private static void rewriteUsersFile() {
+				IdGenerator.initialize(maxId);
+			}
 
-        StringBuilder sb = new StringBuilder();
+		} catch (Exception e) {
+			System.out.println("Error loading users: " + e.getMessage());
+		}
+	}
 
-        // CSV Header
-        sb.append("id,username,password,role")
-          .append(System.lineSeparator());
+	// ================= REWRITE =================
 
-        for (User user : USERS.values()) {
+	private static void rewriteUsersFile() {
 
-            sb.append(user.getUserId()).append(",")
-              .append(user.getUsername()).append(",")
-              .append(user.getPassword()).append(",")
-              .append(user.getRole())
-              .append(System.lineSeparator());
-        }
+		StringBuilder sb = new StringBuilder();
 
-        FileUtil.overwriteFile(USERS_FILE, sb.toString());
-    }
+		// CSV Header
+		sb.append("id,username,password,role").append(System.lineSeparator());
 
-    // ================= REGISTER =================
+		for (User user : USERS.values()) {
 
-    @Override
-    public void registerUser(String username, String password, String roleInput) {
+			sb.append(user.getUserId()).append(",").append(user.getUsername()).append(",").append(user.getPassword())
+					.append(",").append(user.getRole()).append(System.lineSeparator());
+		}
 
-        if (!ValidationUtil.isNotBlank(username) ||
-            !ValidationUtil.isNotBlank(password) ||
-            !ValidationUtil.isNotBlank(roleInput)) {
+		FileUtil.overwriteFile(USERS_FILE, sb.toString());
+	}
 
-            throw new IllegalArgumentException("Invalid input");
-        }
+	// ================= REGISTER =================
 
-        username = username.trim();
+	@Override
+	public void registerUser(String username, String password, String roleInput) {
 
-        if (USERS.containsKey(username)) {
-            throw new IllegalArgumentException("Username already exists");
-        }
+		if (!ValidationUtil.isNotBlank(username) || !ValidationUtil.isNotBlank(password)
+				|| !ValidationUtil.isNotBlank(roleInput)) {
 
-        Role role;
+			throw new IllegalArgumentException("Invalid input");
+		}
 
-        try {
-            role = Role.valueOf(roleInput.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid role. Use ADMIN or USER.");
-        }
+		username = username.trim();
 
-        User user = new User(
-                IdGenerator.generateId(),
-                username,
-                PasswordUtil.hashPassword(password),
-                role
-        );
+		if (USERS.containsKey(username)) {
+			throw new IllegalArgumentException("Username already exists");
+		}
 
-        USERS.put(username, user);
+		Role role;
 
-        rewriteUsersFile();
-    }    
+		try {
+			role = Role.valueOf(roleInput.toUpperCase());
+		} catch (IllegalArgumentException e) {
+			throw new IllegalArgumentException("Invalid role. Use ADMIN or USER.");
+		}
 
-    // ================= GETTERS =================
+		User user = new User(IdGenerator.generateId(), username, PasswordUtil.hashPassword(password), role);
 
-    @Override
-    public User getUserByUsername(String username) {
-        return USERS.get(username);
-    }
+		USERS.put(username, user);
 
-    @Override
-    public Map<String, User> getAllUsers() {
-        return USERS;
-    }
+		rewriteUsersFile();
+	}
+
+	// ================= GETTERS =================
+
+	@Override
+	public User getUserByUsername(String username) {
+
+		if (!ValidationUtil.isNotBlank(username)) {
+			throw new IllegalArgumentException("Username cannot be blank");
+		}
+
+		return USERS.get(username.trim());
+	}
+
+	@Override
+	public Map<String, User> getAllUsers() {
+		return Map.copyOf(USERS);
+	}
+
 }

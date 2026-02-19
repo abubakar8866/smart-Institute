@@ -14,13 +14,14 @@ public class AdminDashboard {
 
 	private final Scanner sc = new Scanner(System.in);
 
-	private final StudentService studentService = new StudentServiceImpl();
 	private final TeacherService teacherService = new TeacherServiceImpl();
 	private final CourseService courseService = new CourseServiceImpl();
 	private final AttendanceService attendanceService = new AttendanceServiceImpl();
 	private final PaymentService paymentService = new PaymentServiceImpl(courseService);
+	private final StudentService studentService = new StudentServiceImpl(paymentService, attendanceService);
 
-	private final ReportService reportService = new ReportServiceImpl(studentService, teacherService, attendanceService,paymentService);
+	private final ReportService reportService = new ReportServiceImpl(studentService, teacherService, attendanceService,
+			paymentService);
 
 	public void start() {
 
@@ -60,10 +61,10 @@ public class AdminDashboard {
 
 		System.out.print("Course ID: ");
 		Integer courseId = Integer.parseInt(sc.nextLine());
-		
+
 		Integer studentId = IdGenerator.generateId();
 
-		Student student = new Student(studentId,name, email, courseId, 0.0, 0.0);
+		Student student = new Student(studentId, name, email, courseId);
 
 		studentService.addStudent(student);
 		System.out.println("Student added successfully");
@@ -78,9 +79,11 @@ public class AdminDashboard {
 		String subject = sc.nextLine();
 
 		System.out.print("Salary: ");
-		Double salary = Double.parseDouble(sc.nextLine());
+		BigDecimal salary = new BigDecimal(sc.nextLine());
 
-		Teacher teacher = new Teacher(name, subject, salary);
+		Integer teacherId = IdGenerator.generateId();
+
+		Teacher teacher = new Teacher(teacherId, name, subject, salary);
 
 		teacherService.addTeacher(teacher);
 		System.out.println("Teacher added successfully");
@@ -107,56 +110,54 @@ public class AdminDashboard {
 
 	private void generateReports() {
 
-	    boolean running = true;
+		boolean running = true;
 
-	    while (running) {
+		while (running) {
 
-	        System.out.println("""
-	            --- REPORT MENU ---
-	            1. Student Report
-	            2. Teacher Report
-	            3. Student By Course
-	            4. Pending Fees
-	            5. Low Attendance
-	            6. Teacher-Course Mapping
-	            7. Generate ALL
-	            0. Back
-	        """);
+			System.out.println("""
+					    --- REPORT MENU ---
+					    1. Student Report
+					    2. Teacher Report
+					    3. Student By Course
+					    4. Pending Fees
+					    5. Low Attendance
+					    6. Teacher-Course Mapping
+					    7. Generate ALL
+					    0. Back
+					""");
 
-	        System.out.print("Choose: ");
-	        int choice = Integer.parseInt(sc.nextLine());
+			System.out.print("Choose: ");
+			int choice = Integer.parseInt(sc.nextLine());
 
-	        switch (choice) {
+			switch (choice) {
 
-	            case 1 -> reportService.generateStudentReportAsync();
+			case 1 -> reportService.generateStudentReportAsync();
 
-	            case 2 -> reportService.generateTeacherReportAsync();
+			case 2 -> reportService.generateTeacherReportAsync();
 
-	            case 3 -> reportService.generateStudentByCourseReportAsync();
+			case 3 -> reportService.generateStudentByCourseReportAsync();
 
-	            case 4 -> reportService.generatePendingFeesReportAsync();
+			case 4 -> reportService.generatePendingFeesReportAsync();
 
-	            case 5 -> {
-	                System.out.print("Enter attendance threshold (%): ");
-	                double threshold =
-	                        Double.parseDouble(sc.nextLine());
-	                reportService.generateLowAttendanceReportAsync(threshold);
-	            }
+			case 5 -> {
+				System.out.print("Enter attendance threshold (%): ");
+				double threshold = Double.parseDouble(sc.nextLine());
+				reportService.generateLowAttendanceReportAsync(threshold);
+			}
 
-	            case 6 -> reportService.generateTeacherCourseMappingReportAsync();
+			case 6 -> reportService.generateTeacherCourseMappingReportAsync();
 
-	            case 7 -> reportService.generateAllReportsAsync();
+			case 7 -> reportService.generateAllReportsAsync();
 
-	            case 0 -> running = false;
+			case 0 -> running = false;
 
-	            default -> System.out.println("Invalid choice");
-	        }
+			default -> System.out.println("Invalid choice");
+			}
 
-	        if (choice != 0) {
-	            System.out.println("Selected report(s) are generating in background...");
-	        }
-	    }
+			if (choice != 0) {
+				System.out.println("Selected report(s) are generating in background...");
+			}
+		}
 	}
-
 
 }

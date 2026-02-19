@@ -11,4 +11,9 @@ public final class IdGenerator {
     public static Integer generateId() {
         return counter.incrementAndGet();
     }
+    
+    public static void initialize(Integer lastId) {
+        counter.set(lastId);
+    }
+    
 }

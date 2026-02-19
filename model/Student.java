@@ -6,18 +6,13 @@ public class Student {
 	private String name;
 	private String email;
 	private Integer courseId;
-	private Double feesPaid;
-	private Double attendancePercentage;
 
-	public Student(Integer studentId, String name, String email, Integer courseId, Double feesPaid,
-			Double attendancePercentage) {
+	public Student(Integer studentId, String name, String email, Integer courseId) {
 
 		this.studentId = studentId;
 		this.name = name;
 		this.email = email;
 		this.courseId = courseId;
-		this.feesPaid = feesPaid;
-		this.attendancePercentage = attendancePercentage;
 	}
 
 	public Integer getStudentId() {
@@ -48,24 +43,8 @@ public class Student {
 		this.courseId = courseId;
 	}
 
-	public Double getFeesPaid() {
-		return feesPaid;
-	}
-
-	public void setFeesPaid(Double feesPaid) {
-		this.feesPaid = feesPaid;
-	}
-
-	public Double getAttendancePercentage() {
-		return attendancePercentage;
-	}
-
-	public void setAttendancePercentage(Double attendancePercentage) {
-		this.attendancePercentage = attendancePercentage;
-	}
-
 	@Override
 	public String toString() {
-		return studentId + "," + name + "," + email + "," + courseId + "," + feesPaid + "," + attendancePercentage;
+		return studentId + "," + name + "," + email + "," + courseId;
 	}
 }

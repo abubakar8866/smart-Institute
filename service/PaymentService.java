@@ -2,6 +2,7 @@ package service;
 
 import model.Payment;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface PaymentService {
@@ -19,4 +20,7 @@ public interface PaymentService {
     void deletePayment(Integer paymentId);
     
     List<Integer> getStudentsWithPendingFees();
+    
+    BigDecimal getTotalPaidByStudent(Integer studentId);
+
 }

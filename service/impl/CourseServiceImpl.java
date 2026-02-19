@@ -4,6 +4,7 @@ import model.Course;
 import service.CourseService;
 import util.ValidationUtil;
 import util.FileUtil;
+import util.IdGenerator;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -17,166 +18,160 @@ import exception.CourseNotFoundException;
 
 public class CourseServiceImpl implements CourseService {
 
-    private final Map<Integer, Course> courseMap = new ConcurrentHashMap<>();
+	private final Map<Integer, Course> courseMap = new ConcurrentHashMap<>();
 
-    private static final String COURSE_FILE = "data/courses.csv";
+	private static final String COURSE_FILE = "data/courses.csv";
 
-    public CourseServiceImpl() {
-        loadCoursesFromFile();
-    }
-    
-    private void loadCoursesFromFile() {
+	public CourseServiceImpl() {
+		loadCoursesFromFile();
+	}
 
-        File file = new File(COURSE_FILE);
+	private void loadCoursesFromFile() {
 
-        if (!file.exists() || file.length() == 0) {
-            return;
-        }
+		File file = new File(COURSE_FILE);
 
-        try (BufferedReader reader =
-                     new BufferedReader(new FileReader(file))) {
+		if (!file.exists() || file.length() == 0) {
+			return;
+		}
 
-            String line;
-            boolean isFirstLine = true;
+		try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
 
-            while ((line = reader.readLine()) != null) {
+			String line;
+			boolean isFirstLine = true;
 
-                if (isFirstLine) {
-                    isFirstLine = false;
-                    continue; // skip header
-                }
+			while ((line = reader.readLine()) != null) {
 
-                String[] parts = line.split(",");
+				if (isFirstLine) {
+					isFirstLine = false;
+					continue; // skip header
+				}
 
-                Integer id = Integer.parseInt(parts[0].trim());
-                String name = parts[1];
-                Integer duration = Integer.parseInt(parts[2]);
-                BigDecimal fees = new BigDecimal(parts[3]);
+				String[] parts = line.split(",");
 
-                Course course = new Course(id, name, duration, fees);
+				if (parts.length != 4)
+					continue;
 
-                courseMap.put(id, course);
-            }
+				Integer id = Integer.parseInt(parts[0].trim());
+				String name = parts[1].trim();
+				Integer duration = Integer.parseInt(parts[2].trim());
+				BigDecimal fees = new BigDecimal(parts[3].trim());
 
-        } catch (Exception e) {
-            throw new RuntimeException("Error loading courses file", e);
-        }
-    }
+				Course course = new Course(id, name, duration, fees);
 
-    private void rewriteCourseFile() {
+				courseMap.put(id, course);
+			}
 
-        StringBuilder builder = new StringBuilder();
+			if (!courseMap.isEmpty()) {
 
-        builder.append("courseId,courseName,duration,fees")
-               .append(System.lineSeparator());
+				Integer maxId = courseMap.values().stream().map(Course::getCourseId).max(Integer::compareTo)
+						.orElse(1000);
 
-        for (Course course : courseMap.values()) {
+				IdGenerator.initialize(maxId);
+			}
 
-            builder.append(course.getCourseId())
-                   .append(",")
-                   .append(course.getCourseName())
-                   .append(",")
-                   .append(course.getDuration())
-                   .append(",")
-                   .append(course.getFees().toPlainString())
-                   .append(System.lineSeparator());
-        }
+		} catch (Exception e) {
+			throw new RuntimeException("Error loading courses file", e);
+		}
+	}
 
-        FileUtil.overwriteFile(COURSE_FILE, builder.toString());
-    }
-    
-    private void validateCourse(Course course) {
+	private void rewriteCourseFile() {
 
-        if (course == null ||
-                course.getCourseId() == null ||
-                !ValidationUtil.isNotBlank(course.getCourseName()) ||
-                course.getDuration() == null ||
-                course.getFees() == null) {
+		StringBuilder builder = new StringBuilder();
 
-            throw new IllegalArgumentException("Invalid course data");
-        }
-    }
+		builder.append("courseId,courseName,duration,fees").append(System.lineSeparator());
 
-    private void validateCourseId(Integer courseId) {
-        if (courseId == null) {
-            throw new IllegalArgumentException("CourseId cannot be null");
-        }
-    }
-    
-    @Override
-    public void addCourse(Course course) {
+		for (Course course : courseMap.values()) {
 
-        validateCourse(course);
+			builder.append(course.getCourseId()).append(",").append(course.getCourseName()).append(",")
+					.append(course.getDuration()).append(",").append(course.getFees().toPlainString())
+					.append(System.lineSeparator());
+		}
 
-        if (courseMap.putIfAbsent(course.getCourseId(), course) != null) {
-            throw new IllegalArgumentException(
-                    "Course already exists with ID: " + course.getCourseId());
-        }
+		FileUtil.overwriteFile(COURSE_FILE, builder.toString());
+	}
 
-        rewriteCourseFile();
+	private void validateCourse(Course course) {
 
-        FileUtil.writeToFile("data/course-logs.txt",
-                "ADDED: " + course.getCourseName());
-    }
+		if (course == null || course.getCourseId() == null || !ValidationUtil.isNotBlank(course.getCourseName())
+				|| course.getDuration() == null || course.getDuration() <= 0 || course.getFees() == null) {
 
-    @Override
-    public Course getCourseById(Integer courseId) {
+			throw new IllegalArgumentException("Invalid course data");
+		}
+	}
 
-        validateCourseId(courseId);
+	private void validateCourseId(Integer courseId) {
+		if (courseId == null) {
+			throw new IllegalArgumentException("CourseId cannot be null");
+		}
+	}
 
-        Course course = courseMap.get(courseId);
+	@Override
+	public void addCourse(Course course) {
 
-        if (course == null) {
-            throw new CourseNotFoundException(
-                    "Course not found with ID: " + courseId);
-        }
+		validateCourse(course);
 
-        return course;
-    }
+		if (courseMap.putIfAbsent(course.getCourseId(), course) != null) {
+			throw new IllegalArgumentException("Course already exists with ID: " + course.getCourseId());
+		}
 
-    @Override
-    public Map<Integer, Course> getAllCourses() {
-        return Collections.unmodifiableMap(courseMap);
-    }
+		rewriteCourseFile();
 
-    @Override
-    public void updateCourse(Integer courseId, Course updatedCourse) {
+		FileUtil.writeToFile("data/course-logs.txt", "ADDED: " + course.getCourseName());
+	}
 
-        validateCourse(updatedCourse);
+	@Override
+	public Course getCourseById(Integer courseId) {
 
-        if (!courseId.equals(updatedCourse.getCourseId())) {
-            throw new IllegalArgumentException("Course ID mismatch");
-        }
+		validateCourseId(courseId);
 
-        if (!courseMap.containsKey(courseId)) {
-            throw new CourseNotFoundException(
-                    "Course not found with ID: " + courseId);
-        }
+		Course course = courseMap.get(courseId);
 
-        courseMap.put(courseId, updatedCourse);
-        
-        rewriteCourseFile();
+		if (course == null) {
+			throw new CourseNotFoundException("Course not found with ID: " + courseId);
+		}
 
-        FileUtil.writeToFile("data/course-logs.txt",
-                "UPDATED: " + updatedCourse.getCourseName());
-    }
+		return course;
+	}
 
-    @Override
-    public void deleteCourse(Integer courseId) {
+	@Override
+	public Map<Integer, Course> getAllCourses() {
+		return Collections.unmodifiableMap(courseMap);
+	}
 
-        validateCourseId(courseId);
+	@Override
+	public void updateCourse(Integer courseId, Course updatedCourse) {
 
-        Course removed = courseMap.remove(courseId);
-        
-        rewriteCourseFile();
+		validateCourse(updatedCourse);
 
-        if (removed == null) {
-            throw new CourseNotFoundException(
-                    "Course not found with ID: " + courseId);
-        }
+		if (!courseId.equals(updatedCourse.getCourseId())) {
+			throw new IllegalArgumentException("Course ID mismatch");
+		}
 
-        FileUtil.writeToFile("data/course-logs.txt",
-                "DELETED: " + removed.getCourseName());
-    }
+		if (!courseMap.containsKey(courseId)) {
+			throw new CourseNotFoundException("Course not found with ID: " + courseId);
+		}
+
+		courseMap.put(courseId, updatedCourse);
+
+		rewriteCourseFile();
+
+		FileUtil.writeToFile("data/course-logs.txt", "UPDATED: " + updatedCourse.getCourseName());
+	}
+
+	@Override
+	public void deleteCourse(Integer courseId) {
+
+		validateCourseId(courseId);
+
+		Course removed = courseMap.remove(courseId);
+
+		if (removed == null) {
+			throw new CourseNotFoundException("Course not found with ID: " + courseId);
+		}
+
+		rewriteCourseFile();
+
+		FileUtil.writeToFile("data/course-logs.txt", "DELETED: " + removed.getCourseName());
+	}
 
 }
