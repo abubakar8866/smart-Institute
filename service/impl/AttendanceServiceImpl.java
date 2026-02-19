@@ -17,184 +17,133 @@ import exception.NoRecordAttendanceException;
 
 public class AttendanceServiceImpl implements AttendanceService {
 
-    private final Map<Integer, List<Attendance>> attendanceMap =
-            new ConcurrentHashMap<>();
+	private final Map<Integer, List<Attendance>> attendanceMap = new ConcurrentHashMap<>();
 
-    private static final String ATTENDANCE_FILE = "data/attendance.csv";
-    
-    private static final String REPORT_FILE = "data/attendance-report.csv";
-    
-    private void ensureReportHeader() {
+	private static final String ATTENDANCE_FILE = "data/attendance.csv";
 
-        File file = new File(REPORT_FILE);
+	private void loadAttendanceFromFile() {
 
-        if (!file.exists() || file.length() == 0) {
-            FileUtil.writeToFile(REPORT_FILE,
-                    "studentId,attendancePercentage");
-        }
-    }
-    
-    private void loadAttendanceFromFile() {
+		File file = new File(ATTENDANCE_FILE);
 
-        File file = new File(ATTENDANCE_FILE);
+		if (!file.exists() || file.length() == 0) {
+			return; // nothing to load
+		}
 
-        if (!file.exists() || file.length() == 0) {
-            return; // nothing to load
-        }
+		try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
 
-        try (BufferedReader reader =
-                     new BufferedReader(new FileReader(file))) {
+			String line;
+			boolean isFirstLine = true;
 
-            String line;
-            boolean isFirstLine = true;
+			while ((line = reader.readLine()) != null) {
 
-            while ((line = reader.readLine()) != null) {
+				// Skip header
+				if (isFirstLine) {
+					isFirstLine = false;
+					continue;
+				}
 
-                // Skip header
-                if (isFirstLine) {
-                    isFirstLine = false;
-                    continue;
-                }
+				String[] parts = line.split(",");
 
-                String[] parts = line.split(",");
+				if (parts.length != 3)
+					continue;
 
-                Integer studentId = Integer.parseInt(parts[0]);
-                LocalDate date = LocalDate.parse(parts[1]);
-                Boolean present = Boolean.parseBoolean(parts[2]);
+				Integer studentId = Integer.parseInt(parts[0]);
+				LocalDate date = LocalDate.parse(parts[1]);
+				Boolean present = Boolean.parseBoolean(parts[2]);
 
-                Attendance attendance =
-                        new Attendance(studentId, date, present);
+				Attendance attendance = new Attendance(studentId, date, present);
 
-                attendanceMap
-                        .computeIfAbsent(studentId,
-                                k -> new CopyOnWriteArrayList<>())
-                        .add(attendance);
-            }
+				attendanceMap.computeIfAbsent(studentId, k -> new CopyOnWriteArrayList<>()).add(attendance);
+			}
 
-        } catch (Exception e) {
-            throw new RuntimeException("Error loading attendance file", e);
-        }
-    }
+		} catch (Exception e) {
+			throw new RuntimeException("Error loading attendance file", e);
+		}
+	}
 
-    
-    public AttendanceServiceImpl() {
-        loadAttendanceFromFile();
-    }
-    
-    private void validateStudentId(Integer studentId) {
-        if (studentId == null) {
-            throw new IllegalArgumentException(
-                    "StudentId cannot be null");
-        }
-    }
-    
-    private void rewriteAttendanceFile() {
+	public AttendanceServiceImpl() {
+		loadAttendanceFromFile();
+	}
 
-        StringBuilder builder = new StringBuilder();
+	private void validateStudentId(Integer studentId) {
+		if (studentId == null) {
+			throw new IllegalArgumentException("StudentId cannot be null");
+		}
+	}
 
-        // Add header
-        builder.append("studentId,date,present")
-               .append(System.lineSeparator());
+	private void rewriteAttendanceFile() {
 
-        for (Map.Entry<Integer, List<Attendance>> entry : attendanceMap.entrySet()) {
+		StringBuilder builder = new StringBuilder();
 
-            for (Attendance attendance : entry.getValue()) {
+		// Add header
+		builder.append("studentId,date,present").append(System.lineSeparator());
 
-                builder.append(attendance.getStudentId())
-                       .append(",")
-                       .append(attendance.getDate())
-                       .append(",")
-                       .append(attendance.getPresent())
-                       .append(System.lineSeparator());
-            }
-        }
+		for (Map.Entry<Integer, List<Attendance>> entry : attendanceMap.entrySet()) {
 
-        FileUtil.overwriteFile(ATTENDANCE_FILE, builder.toString());
-    }
+			for (Attendance attendance : entry.getValue()) {
 
-    @Override
-    public void markAttendance(Integer studentId, boolean present) {
+				builder.append(attendance.getStudentId()).append(",").append(attendance.getDate()).append(",")
+						.append(attendance.getPresent()).append(System.lineSeparator());
+			}
+		}
 
-        validateStudentId(studentId);
+		FileUtil.overwriteFile(ATTENDANCE_FILE, builder.toString());
+	}
 
-        attendanceMap.putIfAbsent(studentId,
-                new CopyOnWriteArrayList<>());
+	@Override
+	public void markAttendance(Integer studentId, boolean present) {
 
-        List<Attendance> records = attendanceMap.get(studentId);
+		validateStudentId(studentId);
 
-        LocalDate today = LocalDate.now();
+		attendanceMap.putIfAbsent(studentId, new CopyOnWriteArrayList<>());
 
-        boolean alreadyMarked = records.stream()
-                .anyMatch(a -> a.getDate().equals(today));
+		List<Attendance> records = attendanceMap.get(studentId);
 
-        if (alreadyMarked) {
-            throw new IllegalArgumentException(
-                    "Attendance already marked for today for student: "
-                            + studentId);
-        }
+		LocalDate today = LocalDate.now();
 
-        Attendance attendance =
-                new Attendance(studentId, today, present);
+		boolean alreadyMarked = records.stream().anyMatch(a -> a.getDate().equals(today));
 
-        records.add(attendance);
+		if (alreadyMarked) {
+			throw new IllegalArgumentException("Attendance already marked for today for student: " + studentId);
+		}
 
-        rewriteAttendanceFile();
+		Attendance attendance = new Attendance(studentId, today, present);
 
-        // Log action
-        FileUtil.writeToFile("data/attendance-logs.txt",
-                "MARKED: Student " + studentId +
-                        " | Date: " + today +
-                        " | Present: " + present);
-    }
+		records.add(attendance);
 
-    @Override
-    public double calculateAttendancePercentage(Integer studentId) {
+		rewriteAttendanceFile();
 
-        validateStudentId(studentId);
+		// Log action
+		FileUtil.writeToFile("data/attendance-logs.txt",
+				"MARKED: Student " + studentId + " | Date: " + today + " | Present: " + present);
+	}
 
-        List<Attendance> records =
-                attendanceMap.get(studentId);
+	@Override
+	public double calculateAttendancePercentage(Integer studentId) {
 
-        if (records == null || records.isEmpty()) {
-            throw new NoRecordAttendanceException(
-                    "No attendance record found for student ID: "
-                            + studentId);
-        }
+		validateStudentId(studentId);
 
-        long presentCount = records.stream()
-                .filter(Attendance::getPresent)
-                .count();
+		List<Attendance> records = attendanceMap.get(studentId);
 
-        double percentage =
-                (presentCount * 100.0) / records.size();
+		if (records == null || records.isEmpty()) {
+			throw new NoRecordAttendanceException("No attendance record found for student ID: " + studentId);
+		}
 
-        ensureReportHeader();
+		long presentCount = records.stream().filter(Attendance::getPresent).count();
 
-        FileUtil.writeToFile(REPORT_FILE,
-                studentId + "," +
-                String.format("%.2f", percentage));
+		return (presentCount * 100.0) / records.size();
+	}
 
-        return percentage;
-    }
-    
-    @Override
-    public List<Integer> getStudentsBelowAttendance(double threshold) {
+	@Override
+	public List<Integer> getStudentsBelowAttendance(double threshold) {
 
-        return attendanceMap.entrySet()
-                .stream()
-                .filter(e -> {
-                    long present =
-                            e.getValue().stream()
-                                    .filter(Attendance::getPresent)
-                                    .count();
+		return attendanceMap.entrySet().stream().filter(e -> {
+			long present = e.getValue().stream().filter(Attendance::getPresent).count();
 
-                    double percent =
-                            (present * 100.0) / e.getValue().size();
+			double percent = (present * 100.0) / e.getValue().size();
 
-                    return percent < threshold;
-                })
-                .map(Map.Entry::getKey)
-                .toList();
-    }
-    
+			return percent < threshold;
+		}).map(Map.Entry::getKey).toList();
+	}
+
 }

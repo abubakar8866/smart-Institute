@@ -5,6 +5,7 @@ import model.Student;
 import model.Teacher;
 import service.*;
 import service.impl.*;
+import util.IdGenerator;
 
 import java.math.BigDecimal;
 import java.util.Scanner;
@@ -17,7 +18,7 @@ public class AdminDashboard {
 	private final TeacherService teacherService = new TeacherServiceImpl();
 	private final CourseService courseService = new CourseServiceImpl();
 	private final AttendanceService attendanceService = new AttendanceServiceImpl();
-	PaymentService paymentService = new PaymentServiceImpl(courseService);
+	private final PaymentService paymentService = new PaymentServiceImpl(courseService);
 
 	private final ReportService reportService = new ReportServiceImpl(studentService, teacherService, attendanceService,paymentService);
 
@@ -59,11 +60,13 @@ public class AdminDashboard {
 
 		System.out.print("Course ID: ");
 		Integer courseId = Integer.parseInt(sc.nextLine());
+		
+		Integer studentId = IdGenerator.generateId();
 
-		Student student = new Student(name, email, courseId, 0.0, 0.0);
+		Student student = new Student(studentId,name, email, courseId, 0.0, 0.0);
 
 		studentService.addStudent(student);
-		System.out.println("✅ Student added successfully");
+		System.out.println("Student added successfully");
 	}
 
 	private void addTeacher() {
@@ -80,13 +83,12 @@ public class AdminDashboard {
 		Teacher teacher = new Teacher(name, subject, salary);
 
 		teacherService.addTeacher(teacher);
-		System.out.println("✅ Teacher added successfully");
+		System.out.println("Teacher added successfully");
 	}
 
 	private void addCourse() {
 
-		System.out.print("Course ID: ");
-		Integer courseId = Integer.parseInt(sc.nextLine());
+		Integer courseId = IdGenerator.generateId();
 
 		System.out.print("Course name: ");
 		String name = sc.nextLine();
@@ -100,7 +102,7 @@ public class AdminDashboard {
 		Course course = new Course(courseId, name, duration, fees);
 
 		courseService.addCourse(course);
-		System.out.println("✅ Course added successfully");
+		System.out.println("Course added successfully");
 	}
 
 	private void generateReports() {
@@ -147,11 +149,11 @@ public class AdminDashboard {
 
 	            case 0 -> running = false;
 
-	            default -> System.out.println("❌ Invalid choice");
+	            default -> System.out.println("Invalid choice");
 	        }
 
 	        if (choice != 0) {
-	            System.out.println("📊 Selected report(s) are generating in background...");
+	            System.out.println("Selected report(s) are generating in background...");
 	        }
 	    }
 	}

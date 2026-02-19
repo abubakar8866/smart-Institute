@@ -4,55 +4,58 @@ import util.IdGenerator;
 
 public class Teacher {
 
-    private final Integer teacherId;
-    private String name;
-    private String subject;
-    private Double salary;
+	private final Integer teacherId;
+	private String name;
+	private String subject;
+	private Double salary;
 
-    // ID generated inside constructor
-    public Teacher(String name,
-                   String subject,
-                   Double salary) {
+	// ID generated inside constructor
+	public Teacher(String name, String subject, Double salary) {
 
-        this.teacherId = IdGenerator.generateId();
-        this.name = name;
-        this.subject = subject;
-        this.salary = salary;
-    }
+		this.teacherId = IdGenerator.generateId();
+		this.name = name;
+		this.subject = subject;
+		this.salary = salary;
+	}
 
-    public Integer getTeacherId() {
-        return teacherId;
-    }
+	public Teacher(Integer teacherId, String name, String subject, Double salary) {
 
-    public String getName() {
-        return name;
-    }
+		this.teacherId = teacherId;
+		this.name = name;
+		this.subject = subject;
+		this.salary = salary;
+	}
 
-    public void setName(String name) {
-        this.name = name;
-    }
+	public Integer getTeacherId() {
+		return teacherId;
+	}
 
-    public String getSubject() {
-        return subject;
-    }
+	public String getName() {
+		return name;
+	}
 
-    public void setSubject(String subject) {
-        this.subject = subject;
-    }
+	public void setName(String name) {
+		this.name = name;
+	}
 
-    public Double getSalary() {
-        return salary;
-    }
+	public String getSubject() {
+		return subject;
+	}
 
-    public void setSalary(Double salary) {
-        this.salary = salary;
-    }
+	public void setSubject(String subject) {
+		this.subject = subject;
+	}
 
-    @Override
-    public String toString() {
-        return teacherId + "," +
-               name + "," +
-               subject + "," +
-               salary;
-    }
+	public Double getSalary() {
+		return salary;
+	}
+
+	public void setSalary(Double salary) {
+		this.salary = salary;
+	}
+
+	@Override
+	public String toString() {
+		return teacherId + "," + name + "," + subject + "," + salary;
+	}
 }

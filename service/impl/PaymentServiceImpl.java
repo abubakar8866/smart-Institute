@@ -1,12 +1,16 @@
 package service.impl;
 
 import model.Payment;
+import model.PaymentMode;
 import model.PaymentStatus;
 import service.CourseService;
 import service.PaymentService;
 import util.FileUtil;
 import exception.PaymentNotFoundException;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -20,12 +24,92 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final CourseService courseService;
 
-    private static final String PAYMENT_FILE = "data/payments.txt";
+    private static final String PAYMENT_FILE = "data/payments.csv";
 
     public PaymentServiceImpl(CourseService courseService) {
         this.courseService = courseService;
+        loadPaymentsFromFile();
     }
 
+    private void loadPaymentsFromFile() {
+
+        File file = new File(PAYMENT_FILE);
+
+        if (!file.exists() || file.length() == 0) {
+            return;
+        }
+
+        try (BufferedReader reader =
+                     new BufferedReader(new FileReader(file))) {
+
+            String line;
+            boolean isFirstLine = true;
+
+            while ((line = reader.readLine()) != null) {
+
+                if (isFirstLine) {
+                    isFirstLine = false;
+                    continue; // skip header
+                }
+
+                String[] parts = line.split(",");
+
+                Integer paymentId = Integer.parseInt(parts[0].trim());
+                Integer studentId = Integer.parseInt(parts[1].trim());
+                Integer courseId = Integer.parseInt(parts[2].trim());
+                BigDecimal amount = new BigDecimal(parts[3].trim());
+                PaymentMode mode = PaymentMode.valueOf(parts[4].trim());
+                PaymentStatus status =
+                        PaymentStatus.valueOf(parts[5].trim());
+                LocalDateTime date =
+                        LocalDateTime.parse(parts[6].trim());
+
+                Payment payment = new Payment(
+                        paymentId,
+                        studentId,
+                        courseId,
+                        amount,
+                        mode,
+                        status,
+                        date
+                );
+
+                paymentMap.put(paymentId, payment);
+            }
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error loading payments file", e);
+        }
+    }
+    
+    private void rewritePaymentFile() {
+
+        StringBuilder builder = new StringBuilder();
+
+        builder.append("paymentId,studentId,courseId,amount,paymentMode,status,paymentDate")
+               .append(System.lineSeparator());
+
+        for (Payment payment : paymentMap.values()) {
+
+            builder.append(payment.getPaymentId())
+                   .append(",")
+                   .append(payment.getStudentId())
+                   .append(",")
+                   .append(payment.getCourseId())
+                   .append(",")
+                   .append(payment.getAmount().toPlainString())
+                   .append(",")
+                   .append(payment.getPaymentMode())
+                   .append(",")
+                   .append(payment.getStatus())
+                   .append(",")
+                   .append(payment.getPaymentDate())
+                   .append(System.lineSeparator());
+        }
+
+        FileUtil.overwriteFile(PAYMENT_FILE, builder.toString());
+    }
+    
     /* ---------------- CORE METHODS ---------------- */
 
     @Override
@@ -37,7 +121,7 @@ public class PaymentServiceImpl implements PaymentService {
                     "Payment already exists with ID: " + payment.getPaymentId());
         }
 
-        FileUtil.writeToFile(PAYMENT_FILE, formatPayment(payment));
+        rewritePaymentFile();
     }
 
     @Override
@@ -82,8 +166,8 @@ public class PaymentServiceImpl implements PaymentService {
         payment.setStatus(PaymentStatus.valueOf(status.toUpperCase()));
         payment.setPaymentDate(LocalDateTime.now());
 
-        FileUtil.writeToFile(PAYMENT_FILE,
-                "UPDATED: " + formatPayment(payment));
+        rewritePaymentFile();
+
     }
 
     @Override
@@ -96,8 +180,8 @@ public class PaymentServiceImpl implements PaymentService {
                     "Payment not found with id: " + paymentId);
         }
 
-        FileUtil.writeToFile(PAYMENT_FILE,
-                "DELETED: " + formatPayment(removed));
+        rewritePaymentFile();
+
     }
 
     /* ---------------- REQUIRED METHOD ---------------- */
@@ -165,13 +249,4 @@ public class PaymentServiceImpl implements PaymentService {
         }
     }
 
-    private String formatPayment(Payment payment) {
-        return payment.getPaymentId() + "," +
-                payment.getStudentId() + "," +
-                payment.getCourseId() + "," +
-                payment.getAmount() + "," +
-                payment.getPaymentMode() + "," +
-                payment.getStatus() + "," +
-                payment.getPaymentDate();
-    }
 }

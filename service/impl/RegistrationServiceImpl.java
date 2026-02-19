@@ -1,5 +1,6 @@
 package service.impl;
 
+import model.Role;
 import model.User;
 import service.RegistrationService;
 import util.*;
@@ -10,75 +11,135 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class RegistrationServiceImpl implements RegistrationService {
 
-	static final Map<String, User> USERS = new ConcurrentHashMap<>();
+    private static final String USERS_FILE = "data/users.csv";
 
-	static {
-		loadUsersFromFile();
-	}
+    static final Map<String, User> USERS = new ConcurrentHashMap<>();
 
-	private static void loadUsersFromFile() {
-		try {
+    static {
+        loadUsersFromFile();
+    }
 
-			File file = new File("data/users.txt");
-			if (!file.exists())
-				return;
+    // ================= LOAD =================
 
-			String content = FileUtil.readFile("data/users.txt");
-			if (content.isBlank())
-				return;
+    private static void loadUsersFromFile() {
 
-			String[] lines = content.split("\\R");
+        try {
 
-			for (String line : lines) {
-				String[] parts = line.split(",");
+            File file = new File(USERS_FILE);
+            if (!file.exists())
+                return;
 
-				if (parts.length != 4)
-					continue;
+            String content = FileUtil.readFile(USERS_FILE);
+            if (content.isBlank())
+                return;
 
-				Integer id = Integer.parseInt(parts[0]);
-				String username = parts[1];
-				String password = parts[2];
-				String role = parts[3];
+            String[] lines = content.split("\\R");
 
-				User user = new User(id, username, password, role);
-				USERS.put(username, user);
-			}
+            boolean isFirstLine = true;
 
-		} catch (Exception e) {
-			System.out.println("Error loading users: " + e.getMessage());
-		}
-	}
+            for (String line : lines) {
 
-	@Override
-	public void registerUser(String username, String password, String role) {
+                if (isFirstLine) {   // skip header
+                    isFirstLine = false;
+                    continue;
+                }
 
-		if (!ValidationUtil.isNotBlank(username) || !ValidationUtil.isNotBlank(password)
-				|| !ValidationUtil.isNotBlank(role)) {
-			throw new IllegalArgumentException("Invalid input");
-		}
+                String[] parts = line.split(",");
 
-		username = username.trim();
+                if (parts.length != 4)
+                    continue;
 
-		if (USERS.containsKey(username)) {
-			throw new IllegalArgumentException("Username already exists");
-		}
+                Integer id = Integer.parseInt(parts[0]);
+                String username = parts[1];
+                String password = parts[2];
 
-		User user = new User(IdGenerator.generateId(), username, PasswordUtil.hashPassword(password), role.trim());
+                Role role;
 
-		USERS.put(username, user);
+                try {
+                    role = Role.valueOf(parts[3].toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    System.out.println("Invalid role in CSV: " + parts[3]);
+                    continue;
+                }
 
-		String record = user.getUserId() + "," + user.getUsername() + "," + user.getPassword() + "," + user.getRole();
+                User user = new User(id, username, password, role);
+                USERS.put(username, user);
+            }
 
-		FileUtil.writeToFile("data/users.txt", record);
-	}
+        } catch (Exception e) {
+            System.out.println("Error loading users: " + e.getMessage());
+        }
+    }
 
-	@Override
-	public User getUserByUsername(String username) {
-		return USERS.get(username);
-	}
+    // ================= REWRITE =================
 
-	public static Map<String, User> getAllUsers() {
-		return USERS;
-	}
+    private static void rewriteUsersFile() {
 
+        StringBuilder sb = new StringBuilder();
+
+        // CSV Header
+        sb.append("id,username,password,role")
+          .append(System.lineSeparator());
+
+        for (User user : USERS.values()) {
+
+            sb.append(user.getUserId()).append(",")
+              .append(user.getUsername()).append(",")
+              .append(user.getPassword()).append(",")
+              .append(user.getRole())
+              .append(System.lineSeparator());
+        }
+
+        FileUtil.overwriteFile(USERS_FILE, sb.toString());
+    }
+
+    // ================= REGISTER =================
+
+    @Override
+    public void registerUser(String username, String password, String roleInput) {
+
+        if (!ValidationUtil.isNotBlank(username) ||
+            !ValidationUtil.isNotBlank(password) ||
+            !ValidationUtil.isNotBlank(roleInput)) {
+
+            throw new IllegalArgumentException("Invalid input");
+        }
+
+        username = username.trim();
+
+        if (USERS.containsKey(username)) {
+            throw new IllegalArgumentException("Username already exists");
+        }
+
+        Role role;
+
+        try {
+            role = Role.valueOf(roleInput.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid role. Use ADMIN or USER.");
+        }
+
+        User user = new User(
+                IdGenerator.generateId(),
+                username,
+                PasswordUtil.hashPassword(password),
+                role
+        );
+
+        USERS.put(username, user);
+
+        rewriteUsersFile();
+    }    
+
+    // ================= GETTERS =================
+
+    @Override
+    public User getUserByUsername(String username) {
+        return USERS.get(username);
+    }
+
+    @Override
+    public Map<String, User> getAllUsers() {
+        return USERS;
+    }
 }

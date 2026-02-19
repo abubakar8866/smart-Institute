@@ -5,6 +5,7 @@ import service.StudentService;
 import util.ValidationUtil;
 import util.FileUtil;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -15,11 +16,73 @@ import exception.StudentNotFoundException;
 
 public class StudentServiceImpl implements StudentService {
 
-    private final Map<Integer, Student> studentMap =
+    private static final Map<Integer, Student> studentMap =
             new ConcurrentHashMap<>();
-
-    private static final String STUDENT_FILE = "data/students.txt";
+    
+    private static final String STUDENT_FILE = "data/students.csv";
     private static final String STUDENT_LOG = "data/student-logs.txt";
+    
+    static {
+        loadStudentsFromFile();
+    }
+    
+    private static void loadStudentsFromFile() {
+
+        try {
+
+            File file = new File(STUDENT_FILE);
+            if (!file.exists())
+                return;
+
+            String content = FileUtil.readFile(STUDENT_FILE);
+            if (content.isBlank())
+                return;
+
+            String[] lines = content.split("\\R");
+
+            for (String line : lines) {
+
+                String[] parts = line.split(",");
+
+                if (parts.length != 6)
+                    continue;
+
+                Integer id = Integer.parseInt(parts[0]);
+                String name = parts[1];
+                String email = parts[2];
+                Integer courseId = Integer.parseInt(parts[3]);
+                Double feesPaid = Double.parseDouble(parts[4]);
+                Double attendance = Double.parseDouble(parts[5]);
+
+                Student student =
+                        new Student(id,name, email, courseId,
+                                    feesPaid, attendance);
+
+                studentMap.put(id, student);
+            }
+
+        } catch (Exception e) {
+            System.out.println("Error loading students: " + e.getMessage());
+        }
+    }
+    
+    private static void rewriteStudentsFile() {
+
+        StringBuilder sb = new StringBuilder();
+
+        for (Student student : studentMap.values()) {
+
+            sb.append(student.getStudentId()).append(",")
+              .append(student.getName()).append(",")
+              .append(student.getEmail()).append(",")
+              .append(student.getCourseId()).append(",")
+              .append(student.getFeesPaid()).append(",")
+              .append(student.getAttendancePercentage())
+              .append(System.lineSeparator());
+        }
+
+        FileUtil.overwriteFile(STUDENT_FILE, sb.toString());
+    }
 
     @Override
     public void addStudent(Student student) {
@@ -34,7 +97,7 @@ public class StudentServiceImpl implements StudentService {
                             + student.getStudentId());
         }
 
-        FileUtil.writeToFile(STUDENT_FILE, student.toString());
+        rewriteStudentsFile();
 
         FileUtil.writeToFile(STUDENT_LOG,
                 "ADDED: " + student.getStudentId());
@@ -99,6 +162,8 @@ public class StudentServiceImpl implements StudentService {
                 }
         );
 
+        rewriteStudentsFile();
+        
         FileUtil.writeToFile(STUDENT_LOG,
                 "UPDATED: " + updatedStudent.getStudentId());
     }
@@ -114,6 +179,8 @@ public class StudentServiceImpl implements StudentService {
             throw new StudentNotFoundException(
                     "Student not found with id: " + studentId);
         }
+        
+        rewriteStudentsFile();
 
         FileUtil.writeToFile(STUDENT_LOG,
                 "DELETED: " + studentId);
@@ -144,7 +211,6 @@ public class StudentServiceImpl implements StudentService {
             throw new IllegalArgumentException(
                     "Student ID cannot be null");
         }
-    } 
-    
+    }     
     
 }

@@ -26,7 +26,7 @@ public class UserDashboard {
     // REAL services
     private final AttendanceService attendanceService = new AttendanceServiceImpl();
     private final CourseService courseService = new CourseServiceImpl();
-    PaymentService paymentService = new PaymentServiceImpl(courseService);
+    private final PaymentService paymentService = new PaymentServiceImpl(courseService);
 
     private final StudentService studentService = new StudentServiceImpl();
 
