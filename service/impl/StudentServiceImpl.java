@@ -49,15 +49,16 @@ public class StudentServiceImpl implements StudentService {
 		for (int i = 1; i < lines.length; i++) { // skip header
 
 			String[] parts = lines[i].split(",");
-			if (parts.length != 4)
+			if (parts.length != 5)
 				continue;
 
 			Integer id = Integer.parseInt(parts[0].trim());
-			String name = parts[1].trim();
-			String email = parts[2].trim();
-			Integer courseId = Integer.parseInt(parts[3].trim());
+			Integer userId = Integer.parseInt(parts[1].trim());
+			String name = parts[2].trim();
+			String email = parts[3].trim();
+			Integer courseId = Integer.parseInt(parts[4].trim());
 
-			studentMap.put(id, new Student(id, name, email, courseId));
+			studentMap.put(id, new Student(id, userId, name, email, courseId));
 		}
 
 		if (!studentMap.isEmpty()) {
@@ -73,7 +74,7 @@ public class StudentServiceImpl implements StudentService {
 
 		StringBuilder sb = new StringBuilder();
 
-		sb.append("studentId,name,email,courseId").append(System.lineSeparator());
+		sb.append("studentId,userId,name,email,courseId").append(System.lineSeparator());
 
 		for (Student student : studentMap.values()) {
 			sb.append(student).append(System.lineSeparator());
@@ -121,15 +122,39 @@ public class StudentServiceImpl implements StudentService {
 
 		validateId(studentId);
 
-		Student removed = studentMap.remove(studentId);
+		Student existing = studentMap.get(studentId);
 
-		if (removed == null) {
+		if (existing == null) {
 			throw new StudentNotFoundException("Student not found with id: " + studentId);
 		}
+
+		if (!paymentService.getPaymentsByStudent(studentId).isEmpty()) {
+			throw new IllegalStateException("Cannot delete student. Payment records exist.");
+		}
+
+		double attendancePercentage = attendanceService.calculateAttendancePercentage(studentId);
+
+		if (attendancePercentage > 0) {
+			throw new IllegalStateException("Cannot delete student. Attendance records exist.");
+		}
+
+		studentMap.remove(studentId);
 
 		rewriteStudentsFile();
 
 		FileUtil.writeToFile(STUDENT_LOG, "DELETED: " + studentId);
+	}
+
+	@Override
+	public Student getStudentByUserId(Integer userId) {
+
+		return studentMap.values().stream().filter(s -> s.getUserId().equals(userId)).findFirst()
+				.orElseThrow(() -> new StudentNotFoundException("Student not found for userId: " + userId));
+	}
+
+	@Override
+	public Set<Integer> getAllLinkedUserIds() {
+		return studentMap.values().stream().map(Student::getUserId).collect(Collectors.toSet());
 	}
 
 	/* 🔥 NEW PROFESSIONAL METHOD */

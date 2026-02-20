@@ -9,6 +9,8 @@ import service.impl.RegistrationServiceImpl;
 
 import java.util.Scanner;
 
+import exception.AdminAlreadyExistsException;
+
 public class MainApp {
 
 	private final RegistrationService registrationService;
@@ -65,9 +67,11 @@ public class MainApp {
 
 		try {
 			registrationService.registerUser(username, password, role);
-			System.out.println("Registered Successfully ✅");
-		} catch (Exception e) {
-			System.out.println("Registration Failed: " + e.getMessage());
+			System.out.println("Registered Successfully");
+		} catch (AdminAlreadyExistsException e) {
+			System.out.println(e.getMessage());
+		} catch (IllegalArgumentException e) {
+			System.out.println(e.getMessage());
 		}
 	}
 
@@ -97,81 +101,14 @@ public class MainApp {
 
 	private void showDashboard(User user) {
 
-		boolean loggedIn = true;
-
-		while (loggedIn) {
-
-			System.out.println("\n=== DASHBOARD ===");
-			System.out.println("Welcome " + user.getUsername());
-			System.out.println("Role: " + user.getRole());
-
-			if (user.getRole() == Role.ADMIN) {
-				loggedIn = showAdminMenu(user);
-			} else {
-				loggedIn = showUserMenu(user);
-			}
+		if (user.getRole() == Role.ADMIN) {
+			new AdminDashboard().start();
+		} else {
+			new UserDashboard(user).start();
 		}
 	}
 
-	// ================= ADMIN MENU =================
-
-	private boolean showAdminMenu(User user) {
-
-		System.out.println("1. View Profile");
-		System.out.println("2. View All Users");
-		System.out.println("3. Logout");
-		System.out.print("Choose: ");
-
-		int option = readIntInput();
-
-		switch (option) {
-		case 1 -> printProfile(user);
-		case 2 -> viewAllUsers();
-		case 3 -> {
-			System.out.println("Logged out successfully ✅");
-			return false;
-		}
-		default -> System.out.println("Invalid option.");
-		}
-
-		return true;
-	}
-
-	// ================= USER MENU =================
-
-	private boolean showUserMenu(User user) {
-
-		System.out.println("1. View Profile");
-		System.out.println("2. Logout");
-		System.out.print("Choose: ");
-
-		int option = readIntInput();
-
-		switch (option) {
-		case 1 -> printProfile(user);
-		case 2 -> {
-			System.out.println("Logged out successfully ✅");
-			return false;
-		}
-		default -> System.out.println("Invalid option.");
-		}
-
-		return true;
-	}
-
-	// ================= COMMON METHODS =================
-
-	private void printProfile(User user) {
-		System.out.println("\n--- PROFILE ---");
-		System.out.println("User ID : " + user.getUserId());
-		System.out.println("Username: " + user.getUsername());
-		System.out.println("Role    : " + user.getRole());
-	}
-
-	private void viewAllUsers() {
-		System.out.println("\n--- ALL REGISTERED USERS ---");
-		registrationService.getAllUsers().values().forEach(System.out::println);
-	}
+	// ================= COMMON METHODS ================
 
 	private int readIntInput() {
 

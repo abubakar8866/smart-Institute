@@ -13,7 +13,7 @@ public final class IdGenerator {
     }
     
     public static void initialize(Integer lastId) {
-        counter.set(lastId);
+        counter.updateAndGet(current -> Math.max(current, lastId));
     }
     
 }

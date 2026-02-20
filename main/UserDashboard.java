@@ -18,6 +18,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Scanner;
 
+import exception.StudentNotFoundException;
+
 public class UserDashboard {
 
 	private final User user;
@@ -52,6 +54,9 @@ public class UserDashboard {
 			switch (choice) {
 			case 1 -> viewAttendance();
 			case 2 -> viewPendingFees();
+			case 3 -> viewProfile();
+			case 4 -> viewPaymentHistory();
+			case 5 -> viewCourseDetails();
 			case 0 -> running = false;
 			default -> System.out.println("Invalid choice");
 			}
@@ -60,25 +65,28 @@ public class UserDashboard {
 
 	private void viewAttendance() {
 
-		Student student = studentService.getStudentById(user.getUserId());
+		try {
+			Student student = studentService.getStudentByUserId(user.getUserId());
 
-		if (student == null) {
-			System.out.println("Student not found");
-			return;
+			double percentage = attendanceService.calculateAttendancePercentage(student.getStudentId());
+
+			System.out.println("Attendance: " + percentage + "%");
+
+		} catch (StudentNotFoundException e) {
+			System.out.println("Student not found.");
 		}
 
-		double percentage = attendanceService.calculateAttendancePercentage(student.getStudentId());
-
-		System.out.println("Attendance: " + percentage + "%");
 	}
 
 	private void viewPendingFees() {
 
-		// 1️⃣ Get student
-		Student student = studentService.getStudentById(user.getUserId());
+		Student student;
 
-		if (student == null) {
-			System.out.println("Student not found");
+		// 1️⃣ Get student
+		try {
+			student = studentService.getStudentByUserId(user.getUserId());
+		} catch (StudentNotFoundException e) {
+			System.out.println("Student not found.");
 			return;
 		}
 
@@ -106,5 +114,22 @@ public class UserDashboard {
 		}
 
 		System.out.println("Pending Fees: ₹" + pending);
+	}
+
+	private void viewProfile() {
+		Student student = studentService.getStudentByUserId(user.getUserId());
+		System.out.println(student);
+	}
+
+	private void viewPaymentHistory() {
+	    Student student = studentService.getStudentByUserId(user.getUserId());
+	    List<Payment> payments = paymentService.getPaymentsByStudent(student.getStudentId());
+	    payments.forEach(System.out::println);
+	}
+	
+	private void viewCourseDetails() {
+	    Student student = studentService.getStudentByUserId(user.getUserId());
+	    Course course = courseService.getCourseById(student.getCourseId());
+	    System.out.println(course);
 	}
 }

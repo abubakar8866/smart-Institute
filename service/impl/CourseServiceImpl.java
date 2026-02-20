@@ -48,15 +48,16 @@ public class CourseServiceImpl implements CourseService {
 
 				String[] parts = line.split(",");
 
-				if (parts.length != 4)
+				if (parts.length != 5)
 					continue;
 
 				Integer id = Integer.parseInt(parts[0].trim());
 				String name = parts[1].trim();
 				Integer duration = Integer.parseInt(parts[2].trim());
 				BigDecimal fees = new BigDecimal(parts[3].trim());
+				Integer teacherId = Integer.parseInt(parts[4].trim());
 
-				Course course = new Course(id, name, duration, fees);
+				Course course = new Course(id, name, duration, fees, teacherId);
 
 				courseMap.put(id, course);
 			}
@@ -78,13 +79,13 @@ public class CourseServiceImpl implements CourseService {
 
 		StringBuilder builder = new StringBuilder();
 
-		builder.append("courseId,courseName,duration,fees").append(System.lineSeparator());
+		builder.append("courseId,courseName,duration,fees,teacherId").append(System.lineSeparator());
 
 		for (Course course : courseMap.values()) {
 
 			builder.append(course.getCourseId()).append(",").append(course.getCourseName()).append(",")
 					.append(course.getDuration()).append(",").append(course.getFees().toPlainString())
-					.append(System.lineSeparator());
+					.append(course.getTeacherId()).append(System.lineSeparator());
 		}
 
 		FileUtil.overwriteFile(COURSE_FILE, builder.toString());
@@ -163,15 +164,17 @@ public class CourseServiceImpl implements CourseService {
 
 		validateCourseId(courseId);
 
-		Course removed = courseMap.remove(courseId);
+		Course existingCourse = courseMap.get(courseId);
 
-		if (removed == null) {
+		if (existingCourse == null) {
 			throw new CourseNotFoundException("Course not found with ID: " + courseId);
 		}
 
+		courseMap.remove(courseId);
+
 		rewriteCourseFile();
 
-		FileUtil.writeToFile("data/course-logs.txt", "DELETED: " + removed.getCourseName());
+		FileUtil.writeToFile("data/course-logs.txt", "DELETED: " + existingCourse.getCourseName());
 	}
 
 }

@@ -9,6 +9,8 @@ import java.io.File;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import exception.AdminAlreadyExistsException;
+
 public class RegistrationServiceImpl implements RegistrationService {
 
 	private static final String USERS_FILE = "data/users.csv";
@@ -119,6 +121,15 @@ public class RegistrationServiceImpl implements RegistrationService {
 			role = Role.valueOf(roleInput.toUpperCase());
 		} catch (IllegalArgumentException e) {
 			throw new IllegalArgumentException("Invalid role. Use ADMIN or USER.");
+		}
+
+		if (role == Role.ADMIN) {
+
+			boolean adminExists = USERS.values().stream().anyMatch(u -> u.getRole() == Role.ADMIN);
+
+			if (adminExists) {
+				throw new AdminAlreadyExistsException("Admin already exists in the system.");
+			}
 		}
 
 		User user = new User(IdGenerator.generateId(), username, PasswordUtil.hashPassword(password), role);
