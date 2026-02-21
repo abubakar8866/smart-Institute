@@ -30,7 +30,7 @@ public class MainApp {
 	private void start() {
 
 		while (true) {
-
+			
 			printMainMenu();
 
 			int choice = readIntInput();
@@ -104,7 +104,7 @@ public class MainApp {
 		if (user.getRole() == Role.ADMIN) {
 			new AdminDashboard().start();
 		} else {
-			new UserDashboard(user).start();
+			new UserDashboard().start();
 		}
 	}
 

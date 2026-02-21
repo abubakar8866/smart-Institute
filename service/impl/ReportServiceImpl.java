@@ -8,6 +8,7 @@ import service.*;
 import util.FileUtil;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
@@ -24,6 +25,8 @@ public class ReportServiceImpl implements ReportService {
 			new LinkedBlockingQueue<>());
 
 	private static final String REPORT_FOLDER = "reports/";
+
+	private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
 	public ReportServiceImpl(StudentService studentService, TeacherService teacherService,
 			AttendanceService attendanceService, PaymentService paymentService) {
@@ -65,7 +68,7 @@ public class ReportServiceImpl implements ReportService {
 			StringBuilder report = new StringBuilder(2048);
 
 			report.append("===== STUDENT REPORT =====\n").append("Generated At: ")
-					.append(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).append("\n\n");
+					.append(LocalDateTime.now().format(FORMATTER)).append("\n\n");
 
 			for (Student student : studentService.getAllStudents()) {
 
@@ -100,7 +103,7 @@ public class ReportServiceImpl implements ReportService {
 			StringBuilder report = new StringBuilder(2048);
 
 			report.append("===== TEACHER REPORT =====\n").append("Generated At: ")
-					.append(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).append("\n\n");
+					.append(LocalDateTime.now().format(FORMATTER)).append("\n\n");
 
 			for (Teacher teacher : teacherService.getAllTeachers()) {
 
@@ -124,7 +127,7 @@ public class ReportServiceImpl implements ReportService {
 			StringBuilder report = new StringBuilder(2048);
 
 			report.append("===== STUDENT BY COURSE REPORT =====\n").append("Generated At: ")
-					.append(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).append("\n\n");
+					.append(LocalDateTime.now().format(FORMATTER)).append("\n\n");
 
 			Map<Integer, List<Student>> grouped = studentService.getStudentsGroupedByCourse();
 
@@ -147,10 +150,16 @@ public class ReportServiceImpl implements ReportService {
 			StringBuilder report = new StringBuilder(2048);
 
 			report.append("===== PENDING FEES REPORT =====\n").append("Generated At: ")
-					.append(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).append("\n\n");
+					.append(LocalDateTime.now().format(FORMATTER)).append("\n\n");
 
-			paymentService.getStudentsWithPendingFees()
-					.forEach(id -> report.append("Student ID: ").append(id).append("\n"));
+			Map<Integer, BigDecimal> pendingFees = paymentService.getStudentsWithPendingFees();
+
+			if (pendingFees.isEmpty()) {
+				report.append("No students with pending fees.\n");
+			} else {
+				pendingFees.forEach((studentId, amount) -> report.append("Student ID: ").append(studentId)
+						.append(" | Pending Fees: ").append(amount).append("\n"));
+			}
 
 			writeReport(REPORT_FOLDER + "pending-fees-report.txt", report.toString());
 		});
@@ -164,7 +173,7 @@ public class ReportServiceImpl implements ReportService {
 			StringBuilder report = new StringBuilder(2048);
 
 			report.append("===== LOW ATTENDANCE REPORT =====\n").append("Threshold: ").append(threshold).append("%\n")
-					.append("Generated At: ").append(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).append("\n\n");
+					.append("Generated At: ").append(LocalDateTime.now().format(FORMATTER)).append("\n\n");
 
 			attendanceService.getStudentsBelowAttendance(threshold)
 					.forEach(id -> report.append("Student ID: ").append(id).append("\n"));
@@ -181,7 +190,7 @@ public class ReportServiceImpl implements ReportService {
 			StringBuilder report = new StringBuilder(2048);
 
 			report.append("===== TEACHER COURSE MAPPING =====\n").append("Generated At: ")
-					.append(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).append("\n\n");
+					.append(LocalDateTime.now().format(FORMATTER)).append("\n\n");
 
 			teacherService.getTeacherCourseMapping()
 					.forEach((teacher, course) -> report.append(teacher).append(" -> ").append(course).append("\n"));

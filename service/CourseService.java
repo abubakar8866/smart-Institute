@@ -1,6 +1,6 @@
 package service;
 
-import java.util.Map;
+import java.util.List;
 import model.Course;
 
 public interface CourseService {
@@ -9,7 +9,7 @@ public interface CourseService {
 
     Course getCourseById(Integer courseId);
 
-    Map<Integer, Course> getAllCourses();
+    List<Course> getAllCourses();
 
     void updateCourse(Integer courseId, Course updatedCourse);
 

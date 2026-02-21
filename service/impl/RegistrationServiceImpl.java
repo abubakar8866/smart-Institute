@@ -24,9 +24,7 @@ public class RegistrationServiceImpl implements RegistrationService {
 	// ================= LOAD =================
 
 	private static void loadUsersFromFile() {
-
 		try {
-
 			File file = new File(USERS_FILE);
 			if (!file.exists())
 				return;
@@ -36,25 +34,22 @@ public class RegistrationServiceImpl implements RegistrationService {
 				return;
 
 			String[] lines = content.split("\\R");
-
 			boolean isFirstLine = true;
 
 			for (String line : lines) {
 
-				if (isFirstLine) { // skip header
+				if (isFirstLine) { // skip CSV header
 					isFirstLine = false;
 					continue;
 				}
 
 				String[] parts = line.split(",");
-
 				if (parts.length != 4)
 					continue;
 
 				Integer id = Integer.parseInt(parts[0].trim());
 				String username = parts[1].trim();
-				String password = parts[2].trim();
-
+				String password = parts[2].strip();
 				Role role;
 
 				try {
@@ -65,11 +60,11 @@ public class RegistrationServiceImpl implements RegistrationService {
 				}
 
 				User user = new User(id, username, password, role);
+
 				USERS.put(username, user);
 			}
 
 			if (!USERS.isEmpty()) {
-
 				Integer maxId = USERS.values().stream().map(User::getUserId).max(Integer::compareTo).orElse(1000);
 
 				IdGenerator.initialize(maxId);
@@ -124,15 +119,13 @@ public class RegistrationServiceImpl implements RegistrationService {
 		}
 
 		if (role == Role.ADMIN) {
-
 			boolean adminExists = USERS.values().stream().anyMatch(u -> u.getRole() == Role.ADMIN);
-
 			if (adminExists) {
 				throw new AdminAlreadyExistsException("Admin already exists in the system.");
 			}
 		}
 
-		User user = new User(IdGenerator.generateId(), username, PasswordUtil.hashPassword(password), role);
+		User user = new User(IdGenerator.generateId(), username, password, role);
 
 		USERS.put(username, user);
 

@@ -9,5 +9,7 @@ public interface AttendanceService {
     double calculateAttendancePercentage(Integer studentId);
     
     List<Integer> getStudentsBelowAttendance(double threshold);
+    
+    boolean hasAttendance(Integer studentId);
 	
 }

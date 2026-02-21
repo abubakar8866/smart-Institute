@@ -2,6 +2,7 @@ package service.impl;
 
 import model.Course;
 import service.CourseService;
+import service.TeacherService;
 import util.ValidationUtil;
 import util.FileUtil;
 import util.IdGenerator;
@@ -10,7 +11,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.math.BigDecimal;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,7 +24,10 @@ public class CourseServiceImpl implements CourseService {
 
 	private static final String COURSE_FILE = "data/courses.csv";
 
-	public CourseServiceImpl() {
+	private final TeacherService teacherService;
+
+	public CourseServiceImpl(TeacherService teacherService) {
+		this.teacherService = teacherService;
 		loadCoursesFromFile();
 	}
 
@@ -111,6 +116,11 @@ public class CourseServiceImpl implements CourseService {
 
 		validateCourse(course);
 
+		if (teacherService.getTeacherById(course.getTeacherId()) == null) {
+			throw new IllegalStateException(
+					"Teacher not found with ID: " + course.getTeacherId() + ". Please add teacher first.");
+		}
+
 		if (courseMap.putIfAbsent(course.getCourseId(), course) != null) {
 			throw new IllegalArgumentException("Course already exists with ID: " + course.getCourseId());
 		}
@@ -135,8 +145,8 @@ public class CourseServiceImpl implements CourseService {
 	}
 
 	@Override
-	public Map<Integer, Course> getAllCourses() {
-		return Collections.unmodifiableMap(courseMap);
+	public List<Course> getAllCourses() {
+		return new ArrayList<>(courseMap.values());
 	}
 
 	@Override
@@ -144,13 +154,11 @@ public class CourseServiceImpl implements CourseService {
 
 		validateCourse(updatedCourse);
 
-		if (!courseId.equals(updatedCourse.getCourseId())) {
-			throw new IllegalArgumentException("Course ID mismatch");
-		}
-
 		if (!courseMap.containsKey(courseId)) {
 			throw new CourseNotFoundException("Course not found with ID: " + courseId);
 		}
+
+		teacherService.getTeacherById(updatedCourse.getTeacherId());
 
 		courseMap.put(courseId, updatedCourse);
 

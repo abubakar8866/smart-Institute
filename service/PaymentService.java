@@ -4,6 +4,7 @@ import model.Payment;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 public interface PaymentService {
 
@@ -19,8 +20,10 @@ public interface PaymentService {
 
     void deletePayment(Integer paymentId);
     
-    List<Integer> getStudentsWithPendingFees();
+    Map<Integer, BigDecimal> getStudentsWithPendingFees();
     
     BigDecimal getTotalPaidByStudent(Integer studentId);
+
+	void createPendingPayment(Integer studentId, Integer courseId, BigDecimal courseFee);
 
 }

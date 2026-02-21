@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Scanner;
 import java.util.Set;
 
@@ -33,8 +34,8 @@ public class AdminDashboard {
 
 	public AdminDashboard() {
 
-		this.courseService = new CourseServiceImpl();
-		this.teacherService = new TeacherServiceImpl(courseService);
+		this.teacherService = new TeacherServiceImpl();
+		this.courseService = new CourseServiceImpl(teacherService);
 		this.attendanceService = new AttendanceServiceImpl();
 		this.paymentService = new PaymentServiceImpl(courseService);
 		this.studentService = new StudentServiceImpl(paymentService, attendanceService);
@@ -75,7 +76,7 @@ public class AdminDashboard {
 				default -> System.out.println("Invalid choice");
 				}
 			} catch (Exception e) {
-				System.out.println("❌ Error: " + e.getMessage());
+				System.out.println("Error: " + e.getMessage());
 			}
 		}
 	}
@@ -96,17 +97,34 @@ public class AdminDashboard {
 					0. Back
 					""");
 
+			System.out.print("Choose: ");
 			int choice = Integer.parseInt(sc.nextLine());
 
 			switch (choice) {
 			case 1 -> addStudent();
 			case 2 -> updateStudent();
 			case 3 -> deleteStudent();
-			case 4 -> studentService.getAllStudents().forEach(System.out::println);
-			case 5 -> studentService.getStudentsGroupedByCourse().forEach((k, v) -> {
-				System.out.println("Course ID: " + k);
-				v.forEach(System.out::println);
-			});
+			case 4 -> {
+				List<Student> students = studentService.getAllStudents();
+
+				if (students.isEmpty()) {
+					System.out.println("No students found.");
+				} else {
+					students.forEach(System.out::println);
+				}
+			}
+			case 5 -> {
+				Map<Integer, List<Student>> grouped = studentService.getStudentsGroupedByCourse();
+
+				if (grouped.isEmpty()) {
+					System.out.println("No students enrolled in any course.");
+				} else {
+					grouped.forEach((k, v) -> {
+						System.out.println("Course ID: " + k);
+						v.forEach(System.out::println);
+					});
+				}
+			}
 			case 0 -> running = false;
 			}
 		}
@@ -128,13 +146,28 @@ public class AdminDashboard {
 					0. Back
 					""");
 
+			System.out.print("Choose: ");
 			int choice = Integer.parseInt(sc.nextLine());
 
 			switch (choice) {
 			case 1 -> addTeacher();
 			case 2 -> updateTeacher();
 			case 3 -> deleteTeacher();
-			case 4 -> teacherService.getAllTeachers().forEach(System.out::println);
+			case 4 -> {
+				List<Teacher> teachers = teacherService.getAllTeachers();
+
+				if (teachers.isEmpty()) {
+					System.out.println("No teachers available.");
+					return;
+				}
+
+				System.out.println("----- TEACHER LIST -----");
+
+				teachers.forEach(t -> System.out.printf("ID: %-5d | Name: %-20s | Subject: %-15s | Salary: %s%n",
+						t.getTeacherId(), t.getName(), t.getSubject(), t.getSalary().toPlainString()));
+
+				System.out.println("------------------------");
+			}
 			case 5 -> teacherService.getTeacherCourseMapping()
 					.forEach((id, name) -> System.out.println("Teacher ID: " + id + " | Course: " + name));
 			case 0 -> running = false;
@@ -157,13 +190,22 @@ public class AdminDashboard {
 					0. Back
 					""");
 
+			System.out.print("Choose: ");
 			int choice = Integer.parseInt(sc.nextLine());
 
 			switch (choice) {
 			case 1 -> addCourse();
 			case 2 -> updateCourse();
 			case 3 -> deleteCourse();
-			case 4 -> courseService.getAllCourses().values().forEach(System.out::println);
+			case 4 -> {
+				List<Course> courses = courseService.getAllCourses();
+
+				if (courses.isEmpty()) {
+					System.out.println("No courses available.");
+				} else {
+					courses.forEach(System.out::println);
+				}
+			}
 			case 0 -> running = false;
 			}
 		}
@@ -184,14 +226,28 @@ public class AdminDashboard {
 					0. Back
 					""");
 
+			System.out.print("Choose: ");
 			int choice = Integer.parseInt(sc.nextLine());
 
 			switch (choice) {
 			case 1 -> addPayment();
 			case 2 -> deletePayment();
-			case 3 -> paymentService.getAllPayments().forEach(System.out::println);
-			case 4 ->
-				paymentService.getStudentsWithPendingFees().forEach(id -> System.out.println("Student ID: " + id));
+			case 3 -> paymentService.getAllPayments().stream().findAny().ifPresentOrElse(
+					list -> paymentService.getAllPayments().forEach(System.out::println),
+					() -> System.out.println("No payments found."));
+
+			case 4 -> {
+				Map<Integer, BigDecimal> pendingFees = paymentService.getStudentsWithPendingFees();
+
+				if (pendingFees.isEmpty()) {
+					System.out.println("No students with pending fees.");
+				} else {
+					System.out.println("---- Pending Fees ----");
+					pendingFees.forEach((studentId, amount) -> System.out
+							.println("Student ID: " + studentId + " | Pending Fees: " + amount));
+					System.out.println("----------------------");
+				}
+			}
 			case 0 -> running = false;
 			}
 		}
@@ -211,6 +267,7 @@ public class AdminDashboard {
 					0. Back
 					""");
 
+			System.out.print("Choose: ");
 			int choice = Integer.parseInt(sc.nextLine());
 
 			switch (choice) {
@@ -222,9 +279,34 @@ public class AdminDashboard {
 				System.out.println("Attendance: " + percentage + "%");
 			}
 			case 3 -> {
-				System.out.print("Threshold: ");
-				double t = Double.parseDouble(sc.nextLine());
-				attendanceService.getStudentsBelowAttendance(t).forEach(id -> System.out.println("Student ID: " + id));
+				double threshold;
+
+				// ✅ Validate threshold input
+				while (true) {
+					try {
+						System.out.print("Threshold (0-100): ");
+						threshold = Double.parseDouble(sc.nextLine());
+
+						if (threshold < 0 || threshold > 100) {
+							System.out.println("❌ Invalid input! Enter a number between 0 and 100.");
+							continue;
+						}
+
+						break; // valid threshold
+					} catch (NumberFormatException e) {
+						System.out.println("❌ Invalid input! Enter a numeric value between 0 and 100.");
+					}
+				}
+
+				// ✅ Get students below threshold
+				List<Integer> studentsBelow = attendanceService.getStudentsBelowAttendance(threshold);
+
+				if (studentsBelow.isEmpty()) {
+					System.out.println("All students have attendance above the threshold.");
+				} else {
+					System.out.println("Students below " + threshold + "% attendance:");
+					studentsBelow.forEach(id -> System.out.println("Student ID: " + id));
+				}
 			}
 			case 0 -> running = false;
 			}
@@ -233,40 +315,44 @@ public class AdminDashboard {
 
 	private void addStudent() {
 
-		System.out.print("Name: ");
-		String name = sc.nextLine();
-
-		System.out.print("Email: ");
-		String email = sc.nextLine();
-
-		System.out.print("Course ID: ");
-		Integer courseId = Integer.parseInt(sc.nextLine());
-
-		Integer studentId = IdGenerator.generateId();
-
-		Map<String, User> allUsers = registrationService.getAllUsers();
-		Set<Integer> linkedUserIds = studentService.getAllLinkedUserIds();
-
-		List<User> availableUsers = allUsers.values().stream().filter(u -> u.getRole() == Role.USER)
-				.filter(u -> !linkedUserIds.contains(u.getUserId())).toList();
-
-		if (availableUsers.isEmpty()) {
-			System.out.println("No available users to link.");
+		// 1️⃣ Get all courses
+		List<Course> courses = courseService.getAllCourses();
+		if (courses.isEmpty()) {
+			System.out.println("❌ No courses available. Please add a course first.");
 			return;
 		}
 
-		System.out.println("Available Users:");
-		for (User u : availableUsers) {
-			System.out.println("ID: " + u.getUserId() + " | Username: " + u.getUsername());
+		System.out.println("Available Courses:");
+		courses.forEach(course -> System.out.println(
+				"ID: " + course.getCourseId() + " | Name: " + course.getCourseName() + " | Fees: " + course.getFees()));
+
+		// 2️⃣ Select course
+		System.out.print("Select Course ID: ");
+		Integer courseId = Integer.parseInt(sc.nextLine());
+
+		boolean courseExists = courses.stream().anyMatch(c -> c.getCourseId().equals(courseId));
+		if (!courseExists) {
+			System.out.println("❌ Invalid Course ID.");
+			return;
 		}
 
-		System.out.print("Select User ID: ");
-		Integer selectedUserId = Integer.parseInt(sc.nextLine());
+		// 3️⃣ Enter student details
+		System.out.print("Student Name: ");
+		String name = sc.nextLine();
 
-		Student student = new Student(studentId, selectedUserId, name, email, courseId);
+		System.out.print("Student Email: ");
+		String email = sc.nextLine();
+
+		// 4️⃣ Generate student ID and add student
+		Integer studentId = IdGenerator.generateId();
+		Student student = new Student(studentId, name, email, courseId); // No user linking
 		studentService.addStudent(student);
 
-		System.out.println("✅ Student added successfully");
+		// 5️⃣ Create pending payment for full course fee
+		BigDecimal courseFee = courseService.getCourseById(courseId).getFees();
+		paymentService.createPendingPayment(studentId, courseId, courseFee);
+
+		System.out.println("✅ Student added successfully with pending fees created");
 	}
 
 	private void updateStudent() {
@@ -282,10 +368,23 @@ public class AdminDashboard {
 		System.out.print("New Email: ");
 		String email = sc.nextLine();
 
+		List<Course> courses = courseService.getAllCourses();
+
+		System.out.println("\nAvailable Courses:");
+		courses.forEach(
+				course -> System.out.println("ID: " + course.getCourseId() + " | Name: " + course.getCourseName()));
+
 		System.out.print("New Course ID: ");
 		Integer courseId = Integer.parseInt(sc.nextLine());
 
-		Student updated = new Student(existing.getStudentId(), existing.getUserId(), name, email, courseId);
+		boolean courseExists = courses.stream().anyMatch(course -> course.getCourseId().equals(courseId));
+
+		if (!courseExists) {
+			System.out.println("❌ Invalid Course ID! Student not updated.");
+			return;
+		}
+
+		Student updated = new Student(existing.getStudentId(), name, email, courseId);
 
 		studentService.updateStudent(updated);
 
@@ -299,7 +398,7 @@ public class AdminDashboard {
 
 		studentService.deleteStudent(studentId);
 
-		System.out.println("✅ Student deleted successfully");
+		System.out.println("Student deleted successfully");
 	}
 
 	private void addTeacher() {
@@ -318,7 +417,7 @@ public class AdminDashboard {
 		Teacher teacher = new Teacher(teacherId, name, subject, salary);
 		teacherService.addTeacher(teacher);
 
-		System.out.println("✅ Teacher added successfully");
+		System.out.println("Teacher added successfully");
 	}
 
 	private void updateTeacher() {
@@ -346,7 +445,7 @@ public class AdminDashboard {
 
 		teacherService.updateTeacher(id, updated);
 
-		System.out.println("✅ Teacher updated successfully");
+		System.out.println("Teacher updated successfully");
 	}
 
 	private void deleteTeacher() {
@@ -354,12 +453,28 @@ public class AdminDashboard {
 		System.out.print("Enter Teacher ID to delete: ");
 		Integer teacherId = Integer.parseInt(sc.nextLine());
 
+		boolean assigned = courseService.getAllCourses().stream().anyMatch(c -> teacherId.equals(c.getTeacherId()));
+
+		if (assigned) {
+			System.out.println("❌ Cannot delete teacher. Assigned to a course.");
+			return;
+		}
+
 		teacherService.deleteTeacher(teacherId);
 
-		System.out.println("✅ Teacher deleted successfully");
+		System.out.println("Teacher deleted successfully");
 	}
 
 	private void addCourse() {
+
+		if (teacherService.getAllTeachers().isEmpty()) {
+			System.out.println("❌ No teachers available. Please add teacher first.");
+			return;
+		}
+
+		System.out.println("Available Teachers:");
+		teacherService.getAllTeachers().forEach(t -> System.out
+				.println("ID: " + t.getTeacherId() + " | Name: " + t.getName() + " | Subject: " + t.getSubject()));
 
 		Integer courseId = IdGenerator.generateId();
 
@@ -372,13 +487,14 @@ public class AdminDashboard {
 		System.out.print("Fees: ");
 		BigDecimal fees = new BigDecimal(sc.nextLine());
 
-		System.out.print("Teacher ID: ");
+		System.out.print("Select Teacher ID: ");
 		Integer teacherId = Integer.parseInt(sc.nextLine());
 
 		Course course = new Course(courseId, name, duration, fees, teacherId);
+
 		courseService.addCourse(course);
 
-		System.out.println("✅ Course added successfully");
+		System.out.println("Course added successfully");
 	}
 
 	private void updateCourse() {
@@ -389,7 +505,7 @@ public class AdminDashboard {
 		Course existing = courseService.getCourseById(id);
 
 		if (existing == null) {
-			System.out.println("❌ Course not found");
+			System.out.println("Course not found");
 			return;
 		}
 
@@ -402,6 +518,10 @@ public class AdminDashboard {
 		System.out.print("New Fees (" + existing.getFees() + "): ");
 		BigDecimal fees = new BigDecimal(sc.nextLine());
 
+		System.out.println("Available Teachers:");
+		teacherService.getAllTeachers()
+				.forEach(t -> System.out.println("ID: " + t.getTeacherId() + " | Name: " + t.getName()));
+
 		System.out.print("New Teacher ID (" + existing.getTeacherId() + "): ");
 		Integer teacherId = Integer.parseInt(sc.nextLine());
 
@@ -409,7 +529,7 @@ public class AdminDashboard {
 
 		courseService.updateCourse(id, updated);
 
-		System.out.println("✅ Course updated successfully");
+		System.out.println("Course updated successfully");
 	}
 
 	private void deleteCourse() {
@@ -423,37 +543,54 @@ public class AdminDashboard {
 
 		courseService.deleteCourse(courseId);
 
-		System.out.println("✅ Course deleted successfully");
+		System.out.println("Course deleted successfully");
 	}
 
 	private void addPayment() {
+		try {
+			// 1️⃣ Get Student ID
+			System.out.print("Student ID: ");
+			Integer studentId = Integer.parseInt(sc.nextLine());
 
-		System.out.print("Student ID: ");
-		Integer studentId = Integer.parseInt(sc.nextLine());
+			Student student = studentService.getStudentById(studentId);
+			if (student == null) {
+				System.out.println("❌ Student not found");
+				return;
+			}
 
-		Student student = studentService.getStudentById(studentId);
+			Integer courseId = student.getCourseId();
 
-		if (student == null) {
-			System.out.println("❌ Student not found");
-			return;
+			// 2️⃣ Get Payment Amount
+			System.out.print("Payment Amount: ");
+			BigDecimal amount = new BigDecimal(sc.nextLine());
+
+			// 3️⃣ Get Payment Mode
+			PaymentMode mode;
+			while (true) {
+				System.out.print("Payment Mode (CASH/UPI/CARD): ");
+				String input = sc.nextLine().trim().toUpperCase();
+				try {
+					mode = PaymentMode.valueOf(input);
+					break;
+				} catch (IllegalArgumentException e) {
+					System.out.println("❌ Invalid mode! Enter CASH, UPI, or CARD.");
+				}
+			}
+
+			// 4️⃣ Create Payment object
+			Payment payment = new Payment(IdGenerator.generateId(), studentId, courseId, amount, mode,
+					PaymentStatus.PENDING, LocalDateTime.now());
+
+			// 5️⃣ Delegate to PaymentServiceImpl
+			paymentService.addPayment(payment);
+
+			System.out.println("✅ Payment processed successfully");
+
+		} catch (NumberFormatException e) {
+			System.out.println("❌ Invalid numeric input!");
+		} catch (Exception e) {
+			System.out.println("❌ Error processing payment: " + e.getMessage());
 		}
-
-		Integer courseId = student.getCourseId();
-
-		System.out.print("Amount: ");
-		BigDecimal amount = new BigDecimal(sc.nextLine());
-
-		System.out.print("Payment Mode (CASH/UPI/CARD): ");
-		PaymentMode mode = PaymentMode.valueOf(sc.nextLine().toUpperCase());
-
-		Integer paymentId = IdGenerator.generateId();
-
-		Payment payment = new Payment(paymentId, studentId, courseId, amount, mode, PaymentStatus.SUCCESS,
-				LocalDateTime.now());
-
-		paymentService.addPayment(payment);
-
-		System.out.println("✅ Payment added successfully");
 	}
 
 	private void deletePayment() {
@@ -463,20 +600,53 @@ public class AdminDashboard {
 
 		paymentService.deletePayment(id);
 
-		System.out.println("✅ Payment deleted successfully");
+		System.out.println("Payment deleted successfully");
 	}
 
 	private void markAttendance() {
 
-		System.out.print("Student ID: ");
-		Integer studentId = Integer.parseInt(sc.nextLine());
+		Integer studentId = null;
 
-		System.out.print("Present? (true/false): ");
-		boolean present = Boolean.parseBoolean(sc.nextLine());
+		// 1️⃣ Validate Student ID
+		while (true) {
+			try {
+				System.out.print("Student ID: ");
+				studentId = Integer.parseInt(sc.nextLine());
 
-		attendanceService.markAttendance(studentId, present);
+				// Check if student exists
+				studentService.getStudentById(studentId); // will throw exception if not found
+				break; // valid ID, exit loop
+			} catch (NumberFormatException e) {
+				System.out.println("❌ Invalid input! Enter a numeric Student ID.");
+			} catch (Exception e) {
+				System.out.println("❌ Student not found with ID: " + studentId);
+			}
+		}
 
-		System.out.println("✅ Attendance marked");
+		// 2️⃣ Validate Present input
+		boolean present;
+		while (true) {
+			System.out.print("Present? (true/false): ");
+			String input = sc.nextLine().trim().toLowerCase();
+
+			if (input.equals("true")) {
+				present = true;
+				break;
+			} else if (input.equals("false")) {
+				present = false;
+				break;
+			} else {
+				System.out.println("❌ Invalid input! Please enter 'true' or 'false'.");
+			}
+		}
+
+		// 3️⃣ Mark Attendance
+		try {
+			attendanceService.markAttendance(studentId, present);
+			System.out.println("✅ Attendance marked successfully");
+		} catch (Exception e) {
+			System.out.println("❌ Error marking attendance: " + e.getMessage());
+		}
 	}
 
 	// ---------------- REPORTS ----------------
@@ -509,9 +679,27 @@ public class AdminDashboard {
 			case 3 -> reportService.generateStudentByCourseReportAsync();
 			case 4 -> reportService.generatePendingFeesReportAsync();
 			case 5 -> {
-				System.out.print("Enter attendance threshold (%): ");
-				double threshold = Double.parseDouble(sc.nextLine());
+				double threshold;
+
+				// Validate threshold input
+				while (true) {
+					try {
+						System.out.print("Enter attendance threshold (0-100): ");
+						threshold = Double.parseDouble(sc.nextLine());
+
+						if (threshold < 0 || threshold > 100) {
+							System.out.println("❌ Invalid input! Enter a number between 0 and 100.");
+							continue;
+						}
+
+						break; // valid threshold
+					} catch (NumberFormatException e) {
+						System.out.println("❌ Invalid input! Enter a numeric value between 0 and 100.");
+					}
+				}
+
 				reportService.generateLowAttendanceReportAsync(threshold);
+				System.out.println("✅ Low attendance report triggered for threshold: " + threshold + "%");
 			}
 			case 6 -> reportService.generateTeacherCourseMappingReportAsync();
 			case 7 -> reportService.generateAllReportsAsync();

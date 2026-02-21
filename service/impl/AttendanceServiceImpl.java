@@ -148,5 +148,10 @@ public class AttendanceServiceImpl implements AttendanceService {
 			return percent < threshold;
 		}).map(Map.Entry::getKey).toList();
 	}
+	
+	@Override
+	public boolean hasAttendance(Integer studentId) {
+	    return attendanceMap.containsKey(studentId);
+	}
 
 }

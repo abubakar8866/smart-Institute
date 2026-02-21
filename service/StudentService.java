@@ -21,9 +21,5 @@ public interface StudentService {
     void deleteStudent(Integer studentId);
     
     Map<Integer, List<Student>> getStudentsGroupedByCourse();
-    
-    Student getStudentByUserId(Integer userId);
-    
-    Set<Integer> getAllLinkedUserIds();
 	
 }

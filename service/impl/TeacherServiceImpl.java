@@ -1,7 +1,6 @@
 package service.impl;
 
 import model.Teacher;
-import service.CourseService;
 import service.TeacherService;
 import util.ValidationUtil;
 import util.FileUtil;
@@ -21,12 +20,6 @@ import exception.TeacherNotFoundException;
 public class TeacherServiceImpl implements TeacherService {
 
 	private static final Map<Integer, Teacher> teacherMap = new ConcurrentHashMap<>();
-	private final CourseService courseService;
-
-	public TeacherServiceImpl(CourseService courseService) {
-	    this.courseService = courseService;
-	}
-
 	static {
 		loadTeachersFromFile();
 	}
@@ -154,14 +147,6 @@ public class TeacherServiceImpl implements TeacherService {
 
 		if (existing == null) {
 			throw new TeacherNotFoundException("Teacher not found with id: " + teacherId);
-		}
-
-		// 🔒 BUSINESS VALIDATION
-		boolean assigned = courseService.getAllCourses().values().stream()
-				.anyMatch(c -> teacherId.equals(c.getTeacherId()));
-
-		if (assigned) {
-			throw new IllegalStateException("Cannot delete teacher. Assigned to a course.");
 		}
 
 		teacherMap.remove(teacherId);

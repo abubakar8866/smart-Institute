@@ -3,21 +3,15 @@ package model;
 public class Student {
 
 	private Integer studentId;
-	private Integer userId;
 	private String name;
 	private String email;
 	private Integer courseId;
 
-	public Student(Integer studentId, Integer userId, String name, String email, Integer courseId) {
+	public Student(Integer studentId, String name, String email, Integer courseId) {
 		this.studentId = studentId;
-		this.userId = userId;
 		this.name = name;
 		this.email = email;
 		this.courseId = courseId;
-	}
-
-	public Integer getUserId() {
-		return userId;
 	}
 
 	public Integer getStudentId() {
@@ -50,6 +44,7 @@ public class Student {
 
 	@Override
 	public String toString() {
-		return studentId + "," + userId + "," + name + "," + email + "," + courseId;
+		return "Student [studentId=" + studentId + ", name=" + name + ", email=" + email
+				+ ", courseId=" + courseId + "]";
 	}
 }

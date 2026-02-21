@@ -21,9 +21,7 @@ import java.util.stream.Collectors;
 public class PaymentServiceImpl implements PaymentService {
 
 	private final Map<Integer, Payment> paymentMap = new ConcurrentHashMap<>();
-
 	private final CourseService courseService;
-
 	private static final String PAYMENT_FILE = "data/payments.csv";
 
 	public PaymentServiceImpl(CourseService courseService) {
@@ -32,27 +30,19 @@ public class PaymentServiceImpl implements PaymentService {
 	}
 
 	private void loadPaymentsFromFile() {
-
 		File file = new File(PAYMENT_FILE);
-
-		if (!file.exists() || file.length() == 0) {
+		if (!file.exists() || file.length() == 0)
 			return;
-		}
 
 		try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-
 			String line;
 			boolean isFirstLine = true;
-
 			while ((line = reader.readLine()) != null) {
-
 				if (isFirstLine) {
 					isFirstLine = false;
-					continue; // skip header
+					continue;
 				}
-
 				String[] parts = line.split(",");
-
 				if (parts.length != 7)
 					continue;
 
@@ -65,15 +55,12 @@ public class PaymentServiceImpl implements PaymentService {
 				LocalDateTime date = LocalDateTime.parse(parts[6].trim());
 
 				Payment payment = new Payment(paymentId, studentId, courseId, amount, mode, status, date);
-
 				paymentMap.put(paymentId, payment);
 			}
 
 			if (!paymentMap.isEmpty()) {
-
 				Integer maxId = paymentMap.values().stream().map(Payment::getPaymentId).max(Integer::compareTo)
 						.orElse(1000);
-
 				IdGenerator.initialize(maxId);
 			}
 
@@ -83,18 +70,15 @@ public class PaymentServiceImpl implements PaymentService {
 	}
 
 	private void rewritePaymentFile() {
-
 		StringBuilder builder = new StringBuilder();
-
 		builder.append("paymentId,studentId,courseId,amount,paymentMode,status,paymentDate")
 				.append(System.lineSeparator());
 
-		for (Payment payment : paymentMap.values()) {
-
-			builder.append(payment.getPaymentId()).append(",").append(payment.getStudentId()).append(",")
-					.append(payment.getCourseId()).append(",").append(payment.getAmount().toPlainString()).append(",")
-					.append(payment.getPaymentMode()).append(",").append(payment.getStatus()).append(",")
-					.append(payment.getPaymentDate()).append(System.lineSeparator());
+		for (Payment p : paymentMap.values()) {
+			builder.append(p.getPaymentId()).append(",").append(p.getStudentId()).append(",").append(p.getCourseId())
+					.append(",").append(p.getAmount().toPlainString()).append(",").append(p.getPaymentMode())
+					.append(",").append(p.getStatus()).append(",").append(p.getPaymentDate())
+					.append(System.lineSeparator());
 		}
 
 		FileUtil.overwriteFile(PAYMENT_FILE, builder.toString());
@@ -106,9 +90,51 @@ public class PaymentServiceImpl implements PaymentService {
 	public void addPayment(Payment payment) {
 		validatePayment(payment);
 
-		if (paymentMap.putIfAbsent(payment.getPaymentId(), payment) != null) {
-			throw new IllegalArgumentException("Payment already exists with ID: " + payment.getPaymentId());
+		Optional<Payment> pendingOpt = paymentMap.values().stream()
+				.filter(p -> p.getStudentId().equals(payment.getStudentId()))
+				.filter(p -> p.getCourseId().equals(payment.getCourseId()))
+				.filter(p -> p.getStatus() == PaymentStatus.PENDING).findFirst();
+
+		LocalDateTime now = LocalDateTime.now();
+
+		if (pendingOpt.isPresent()) {
+			Payment pending = pendingOpt.get();
+			BigDecimal remaining = pending.getAmount().subtract(payment.getAmount());
+
+			if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+				// ✅ Fully paid
+				pending.setAmount(BigDecimal.ZERO);
+				pending.setStatus(PaymentStatus.SUCCESS);
+				pending.setPaymentMode(payment.getPaymentMode());
+				pending.setPaymentDate(now);
+			} else {
+				// ✅ Partial payment
+				pending.setAmount(remaining); // Keep remaining as pending
+				pending.setPaymentDate(now); // Update timestamp
+				// Do NOT mark status SUCCESS yet
+			}
+
+			// Record the actual payment as SUCCESS
+			Payment actualPayment = new Payment(IdGenerator.generateId(), payment.getStudentId(), payment.getCourseId(),
+					payment.getAmount(), payment.getPaymentMode(), PaymentStatus.SUCCESS, now);
+			paymentMap.put(actualPayment.getPaymentId(), actualPayment);
+
+		} else {
+			// No pending → treat as new payment
+			paymentMap.put(payment.getPaymentId(), payment);
 		}
+
+		rewritePaymentFile();
+	}
+
+	@Override
+	public void createPendingPayment(Integer studentId, Integer courseId, BigDecimal courseFee) {
+		LocalDateTime now = LocalDateTime.now();
+
+		Payment pending = new Payment(IdGenerator.generateId(), studentId, courseId, courseFee, PaymentMode.CASH, // default
+																													// placeholder
+				PaymentStatus.PENDING, now);
+		paymentMap.put(pending.getPaymentId(), pending);
 
 		rewritePaymentFile();
 	}
@@ -116,21 +142,17 @@ public class PaymentServiceImpl implements PaymentService {
 	@Override
 	public Payment getPaymentById(Integer paymentId) {
 		validatePaymentId(paymentId);
-
 		Payment payment = paymentMap.get(paymentId);
-		if (payment == null) {
+		if (payment == null)
 			throw new PaymentNotFoundException("Payment not found with id: " + paymentId);
-		}
 		return payment;
 	}
 
 	@Override
 	public List<Payment> getPaymentsByStudent(Integer studentId) {
-		if (studentId == null) {
+		if (studentId == null)
 			throw new IllegalArgumentException("StudentId cannot be null");
-		}
-
-		return paymentMap.values().stream().filter(p -> studentId.equals(p.getStudentId())).toList();
+		return paymentMap.values().stream().filter(p -> p.getStudentId().equals(studentId)).toList();
 	}
 
 	@Override
@@ -141,69 +163,35 @@ public class PaymentServiceImpl implements PaymentService {
 	@Override
 	public void updatePaymentStatus(Integer paymentId, String status) {
 		validatePaymentId(paymentId);
-
 		Payment payment = paymentMap.get(paymentId);
-		if (payment == null) {
+		if (payment == null)
 			throw new PaymentNotFoundException("Payment not found with id: " + paymentId);
-		}
 
-		try {
-			payment.setStatus(PaymentStatus.valueOf(status.toUpperCase()));
-		} catch (IllegalArgumentException e) {
-			throw new IllegalArgumentException("Invalid payment status");
-		}
-
+		payment.setStatus(PaymentStatus.valueOf(status.toUpperCase()));
 		payment.setPaymentDate(LocalDateTime.now());
-
 		rewritePaymentFile();
-
 	}
 
 	@Override
 	public void deletePayment(Integer paymentId) {
 		validatePaymentId(paymentId);
-
-		Payment removed = paymentMap.remove(paymentId);
-		if (removed == null) {
+		if (paymentMap.remove(paymentId) == null)
 			throw new PaymentNotFoundException("Payment not found with id: " + paymentId);
-		}
-
 		rewritePaymentFile();
-
 	}
 
 	@Override
 	public BigDecimal getTotalPaidByStudent(Integer studentId) {
-
 		return paymentMap.values().stream().filter(p -> p.getStudentId().equals(studentId))
 				.filter(p -> p.getStatus() == PaymentStatus.SUCCESS).map(Payment::getAmount)
 				.reduce(BigDecimal.ZERO, BigDecimal::add);
 	}
 
-	/* ---------------- REQUIRED METHOD ---------------- */
-
 	@Override
-	public List<Integer> getStudentsWithPendingFees() {
-
-		// Sum SUCCESS payments per (studentId + courseId)
-		Map<String, BigDecimal> totalPaid = paymentMap.values().stream()
-				.filter(p -> p.getStatus() == PaymentStatus.SUCCESS)
-				.collect(Collectors.groupingBy(p -> p.getStudentId() + "-" + p.getCourseId(),
-						Collectors.reducing(BigDecimal.ZERO, Payment::getAmount, BigDecimal::add)));
-
-		return paymentMap.values().stream().map(p -> {
-
-			Integer studentId = p.getStudentId();
-			Integer courseId = p.getCourseId();
-
-			String key = studentId + "-" + courseId;
-
-			BigDecimal paid = totalPaid.getOrDefault(key, BigDecimal.ZERO);
-
-			BigDecimal courseFee = courseService.getCourseById(courseId).getFees();
-
-			return paid.compareTo(courseFee) < 0 ? studentId : null;
-		}).filter(Objects::nonNull).distinct().toList();
+	public Map<Integer, BigDecimal> getStudentsWithPendingFees() {
+		return paymentMap.values().stream().filter(p -> p.getStatus() == PaymentStatus.PENDING)
+				.collect(Collectors.groupingBy(Payment::getStudentId,
+						Collectors.mapping(Payment::getAmount, Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))));
 	}
 
 	/* ---------------- VALIDATION ---------------- */
@@ -213,15 +201,12 @@ public class PaymentServiceImpl implements PaymentService {
 				|| payment.getCourseId() == null || payment.getAmount() == null
 				|| payment.getAmount().compareTo(BigDecimal.ZERO) <= 0 || payment.getPaymentMode() == null
 				|| payment.getStatus() == null || payment.getPaymentDate() == null) {
-
 			throw new IllegalArgumentException("Invalid payment data");
 		}
 	}
 
 	private void validatePaymentId(Integer paymentId) {
-		if (paymentId == null) {
+		if (paymentId == null)
 			throw new IllegalArgumentException("PaymentId cannot be null");
-		}
 	}
-
 }
